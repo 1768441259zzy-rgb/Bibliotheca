@@ -102,7 +102,9 @@ export async function insertUserCover(cover: BookCover): Promise<BookCover> {
     throw new Error(error.message);
   }
 
-  return rowToCover(data as UserCoverRow);
+  const saved = rowToCover(data as UserCoverRow);
+  await appendCoverToOrder(saved.id);
+  return saved;
 }
 
 async function readOverrides(): Promise<Record<string, Partial<BookCover>>> {
@@ -135,11 +137,89 @@ async function readDeletedIds(): Promise<string[]> {
   return ((data as { id: string }[] | null) ?? []).map((r) => r.id);
 }
 
+async function readCoverOrderIds(): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('cover_order')
+    .select('cover_ids')
+    .eq('id', 'default')
+    .maybeSingle();
+
+  if (error) {
+    console.error('readCoverOrderIds failed:', error);
+    throw new Error(error.message);
+  }
+
+  const ids = (data as { cover_ids?: string[] } | null)?.cover_ids;
+  return Array.isArray(ids) ? ids : [];
+}
+
+function applyCoverOrder(covers: BookCover[], orderIds: string[]): BookCover[] {
+  if (orderIds.length === 0) return covers;
+
+  const byId = new Map(covers.map((c) => [c.id, c]));
+  const ordered: BookCover[] = [];
+
+  for (const id of orderIds) {
+    const cover = byId.get(id);
+    if (cover) {
+      ordered.push(cover);
+      byId.delete(id);
+    }
+  }
+
+  for (const cover of byId.values()) {
+    ordered.push(cover);
+  }
+
+  return ordered;
+}
+
+export async function saveCoverOrder(coverIds: string[]): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const unique = Array.from(new Set(coverIds.map((id) => id.trim()).filter(Boolean)));
+
+  const { data, error } = await supabase
+    .from('cover_order')
+    .upsert(
+      {
+        id: 'default',
+        cover_ids: unique,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
+    .select('cover_ids')
+    .single();
+
+  if (error) {
+    console.error('saveCoverOrder failed:', error);
+    throw new Error(error.message);
+  }
+
+  return (data as { cover_ids: string[] }).cover_ids ?? unique;
+}
+
+async function appendCoverToOrder(id: string): Promise<void> {
+  const current = await readCoverOrderIds();
+  // 尚未自定义过排序时不写入，保持「内置在前、用户在后」的默认顺序
+  if (current.length === 0) return;
+  if (current.includes(id)) return;
+  await saveCoverOrder([...current, id]);
+}
+
+async function removeCoverFromOrder(id: string): Promise<void> {
+  const current = await readCoverOrderIds();
+  if (!current.includes(id)) return;
+  await saveCoverOrder(current.filter((x) => x !== id));
+}
+
 export async function getAllCovers(): Promise<BookCover[]> {
-  const [userCovers, overrides, deleted] = await Promise.all([
+  const [userCovers, overrides, deleted, orderIds] = await Promise.all([
     readUserCovers(),
     readOverrides(),
     readDeletedIds(),
+    readCoverOrderIds(),
   ]);
   const deletedSet = new Set(deleted);
 
@@ -151,7 +231,7 @@ export async function getAllCovers(): Promise<BookCover[]> {
     .filter((c) => !deletedSet.has(c.id))
     .map((c) => applyOverride(c, overrides[c.id]));
 
-  return [...builtin, ...users];
+  return applyCoverOrder([...builtin, ...users], orderIds);
 }
 
 export async function uploadCoverImage(
@@ -288,6 +368,7 @@ export async function deleteCoverById(id: string): Promise<boolean> {
       throw new Error(error.message);
     }
     await removeCoverImageIfStored(user.imageUrl);
+    await removeCoverFromOrder(id);
     return true;
   }
 
@@ -316,6 +397,7 @@ export async function deleteCoverById(id: string): Promise<boolean> {
     throw new Error(ovError.message);
   }
 
+  await removeCoverFromOrder(id);
   return true;
 }
 

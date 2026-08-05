@@ -5,6 +5,7 @@ import {
   deleteCoverById,
   getAllCovers,
   insertUserCover,
+  saveCoverOrder,
   updateCoverMeta,
   uploadCoverImage,
 } from '@/lib/covers';
@@ -185,5 +186,42 @@ export async function DELETE(request: Request) {
   } catch (error) {
     console.error('Delete cover failed:', error);
     return NextResponse.json({ error: '删除失败，请稍后重试' }, { status: 500 });
+  }
+}
+
+/** 保存封面展示顺序 */
+export async function PUT(request: Request) {
+  try {
+    const body = (await request.json()) as { ids?: string[] };
+    const ids = Array.isArray(body.ids)
+      ? body.ids.map((id) => String(id ?? '').trim()).filter(Boolean)
+      : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: '排序列表不能为空' }, { status: 400 });
+    }
+
+    const existing = await getAllCovers();
+    const existingIds = new Set(existing.map((c) => c.id));
+    const unknown = ids.filter((id) => !existingIds.has(id));
+    if (unknown.length > 0) {
+      return NextResponse.json(
+        { error: `含未知封面 id：${unknown.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // 把未出现在 ids 里的封面接到末尾，避免漏掉
+    const ordered = [
+      ...ids,
+      ...existing.map((c) => c.id).filter((id) => !ids.includes(id)),
+    ];
+
+    const saved = await saveCoverOrder(ordered);
+    revalidatePath('/cover-art');
+    return NextResponse.json({ ok: true, ids: saved });
+  } catch (error) {
+    console.error('Reorder covers failed:', error);
+    return NextResponse.json({ error: '保存排序失败，请稍后重试' }, { status: 500 });
   }
 }
