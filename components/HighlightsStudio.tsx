@@ -241,28 +241,28 @@ export default function HighlightsStudio({
         : `来自「${bookTitle}」`;
 
   return (
-    <section className="relative z-10 mx-auto max-w-3xl px-4">
+    <section className="relative z-10 mx-auto max-w-3xl pl-3 sm:px-2 md:px-4">
       <FloatingSideIndex groups={groups} />
 
-      <header className="mb-10 text-center">
+      <header className="mb-8 text-center sm:mb-10">
         <InteractiveTitle
           text="Highlights"
           variant="page"
-          className="text-4xl md:text-5xl"
+          className="text-3xl sm:text-4xl md:text-5xl"
         />
-        <p className="mt-4 text-sm tracking-[0.2em] text-ink-muted">
+        <p className="mt-3 text-[11px] tracking-[0.18em] text-ink-muted sm:mt-4 sm:text-sm sm:tracking-[0.2em]">
           ECHOES FROM THE MARGINS
         </p>
         <button
           type="button"
           onClick={openAdd}
-          className="interactive-btn mt-8 border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-5 py-2 text-xs tracking-[0.28em] text-ink hover:bg-[#c9a84c]/20"
+          className="interactive-btn mt-6 border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-5 py-2 text-xs tracking-[0.28em] text-ink hover:bg-[#c9a84c]/20 sm:mt-8"
         >
           + ADD HIGHLIGHT
         </button>
       </header>
 
-      <div className="space-y-10">
+      <div className="space-y-6 sm:space-y-10">
         {groups.map((group) => (
           <HighlightCard
             key={group.id}

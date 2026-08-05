@@ -239,23 +239,23 @@ export default function CoverArtStudio({ initialCovers }: CoverArtStudioProps) {
   const displayPreview = previewUrl || (mode === 'edit' ? existingImageUrl : '');
 
   return (
-    <section className="relative z-10 mx-auto max-w-6xl px-4 pt-2 sm:px-6">
-      <header className="relative z-10 mb-10 text-center">
+    <section className="relative z-10 mx-auto max-w-6xl px-2 pt-2 sm:px-6">
+      <header className="relative z-10 mb-8 text-center sm:mb-10">
         <InteractiveTitle
           text="Cover Art"
           variant="page"
-          className="text-4xl md:text-5xl"
+          className="text-3xl sm:text-4xl md:text-5xl"
         />
-        <p className="mt-4 text-sm tracking-[0.2em] text-ink-muted">
+        <p className="mt-3 text-[11px] tracking-[0.18em] text-ink-muted sm:mt-4 sm:text-sm sm:tracking-[0.2em]">
           A COLLECTION OF VINTAGE BINDINGS
         </p>
-        <p className="mt-3 text-xs tracking-wider text-ink-muted/90">
+        <p className="mt-2 text-[10px] tracking-wider text-ink-muted/90 sm:mt-3 sm:text-xs">
           拖动封面可调整顺序 · 手机可用 ← →
         </p>
         <button
           type="button"
           onClick={openAdd}
-          className="interactive-btn mt-6 border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-5 py-2 text-xs tracking-[0.28em] text-ink hover:bg-[#c9a84c]/20"
+          className="interactive-btn mt-5 border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-5 py-2 text-xs tracking-[0.28em] text-ink hover:bg-[#c9a84c]/20 sm:mt-6"
         >
           + ADD COVER
         </button>
@@ -264,9 +264,9 @@ export default function CoverArtStudio({ initialCovers }: CoverArtStudioProps) {
         )}
       </header>
 
-      <div className="relative px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10">
+      <div className="relative px-2 py-4 sm:px-6 sm:py-8 md:px-8 md:py-10">
         <GoldFiligreeFrame />
-        <div className="relative z-10 mx-auto grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
+        <div className="relative z-10 mx-auto grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
           {covers.map((cover, index) => (
             <CoverCard
               key={cover.id}

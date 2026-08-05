@@ -18,15 +18,15 @@ export default function HighlightCard({
   return (
     <article
       id={`highlight-${group.id}`}
-      className="scroll-mt-28 rounded-sm border border-white/70 bg-white/55 p-8 shadow-card backdrop-blur-md md:p-10"
+      className="scroll-mt-24 rounded-sm border border-white/70 bg-white/55 p-4 shadow-card backdrop-blur-md sm:p-6 md:scroll-mt-28 md:p-10"
     >
-      <header className="mb-8 flex items-start justify-between gap-4 border-b border-ink/10 pb-6">
-        <div className="min-w-0">
-          <h2 className="font-display text-2xl font-medium leading-snug text-ink md:text-3xl">
+      <header className="mb-5 flex items-start justify-between gap-3 border-b border-ink/10 pb-4 sm:mb-8 sm:gap-4 sm:pb-6">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-xl font-medium leading-snug text-ink sm:text-2xl md:text-3xl">
             {group.bookTitle}
           </h2>
           {group.author && (
-            <p className="mt-2 text-sm tracking-widest text-ink-muted">
+            <p className="mt-1.5 text-xs tracking-widest text-ink-muted sm:mt-2 sm:text-sm">
               — {group.author}
             </p>
           )}
@@ -56,14 +56,14 @@ export default function HighlightCard({
         )}
       </header>
 
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {group.quotes.map((quote, index) => (
           <blockquote
             key={`${group.id}-${index}`}
-            className="group/quote relative pl-6 before:absolute before:left-0 before:top-0 before:h-full before:w-0.5 before:bg-parchment-400/80"
+            className="group/quote relative border-l-2 border-parchment-400/80 pl-3 sm:pl-6"
           >
             {(onEditQuote || onDeleteQuote) && (
-              <div className="absolute right-0 top-0 z-10 flex gap-1.5 opacity-0 transition-opacity duration-300 group-hover/quote:opacity-100">
+              <div className="mb-2 flex justify-end gap-1.5 sm:absolute sm:right-0 sm:top-0 sm:z-10 sm:mb-0 sm:opacity-0 sm:transition-opacity sm:duration-300 sm:group-hover/quote:opacity-100">
                 {onEditQuote && (
                   <button
                     type="button"
@@ -84,7 +84,7 @@ export default function HighlightCard({
                 )}
               </div>
             )}
-            <p className="whitespace-pre-line pr-20 text-base leading-[1.9] text-ink-light md:text-lg">
+            <p className="break-words whitespace-pre-line text-[15px] leading-[1.85] text-ink-light sm:text-base sm:leading-[1.9] md:pr-20 md:text-lg">
               {quote}
             </p>
           </blockquote>

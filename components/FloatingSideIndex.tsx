@@ -83,14 +83,14 @@ export default function FloatingSideIndex({ groups }: FloatingSideIndexProps) {
       />
 
       <div
-        className={`fixed top-1/2 left-0 z-[80] flex -translate-y-1/2 items-stretch transition-transform duration-700 ease-[cubic-bezier(0.33,1,0.32,1)] ${
-          open ? 'translate-x-0' : 'translate-x-[calc(-100%+2.35rem)]'
+        className={`fixed top-[min(42%,18rem)] left-0 z-[80] flex -translate-y-1/2 items-stretch transition-transform duration-700 ease-[cubic-bezier(0.33,1,0.32,1)] sm:top-1/2 ${
+          open ? 'translate-x-0' : 'translate-x-[calc(-100%+1.85rem)] sm:translate-x-[calc(-100%+2.35rem)]'
         }`}
       >
         {/* 目录面板 */}
         <aside
           id="highlights-side-index"
-          className="flex w-[min(18rem,78vw)] flex-col border-y border-r border-double border-[#8c6d58] bg-[#fdfbf7]/95 shadow-card backdrop-blur-md"
+          className="flex w-[min(17rem,82vw)] flex-col border-y border-r border-double border-[#8c6d58] bg-[#fdfbf7]/95 shadow-card backdrop-blur-md sm:w-[min(18rem,78vw)]"
           aria-hidden={!open}
         >
           <header className="flex items-center justify-between border-b border-[#8c6d58]/25 px-5 py-4">
@@ -161,7 +161,7 @@ export default function FloatingSideIndex({ groups }: FloatingSideIndexProps) {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="highlights-side-index"
-          className="group relative flex w-[2.35rem] shrink-0 items-center justify-center self-start border-y border-r border-[#8c6d58] bg-[#f4ebe0]/95 py-8 shadow-card backdrop-blur-md transition-colors duration-500 hover:bg-[#efe4d6]"
+          className="group relative flex w-[1.85rem] shrink-0 items-center justify-center self-start border-y border-r border-[#8c6d58] bg-[#f4ebe0]/95 py-6 shadow-card backdrop-blur-md transition-colors duration-500 hover:bg-[#efe4d6] sm:w-[2.35rem] sm:py-8"
           style={{
             borderTopRightRadius: '0.15rem',
             borderBottomRightRadius: '0.15rem',

@@ -19,7 +19,7 @@ export default function RootLayout({
         <div className="site-bg relative min-h-screen">
           <Decorations />
           <Navbar />
-          <main className="relative z-10 px-6 pb-32 pt-24 md:px-10 md:pt-28">
+          <main className="relative z-10 px-4 pb-24 pt-16 sm:px-6 sm:pt-20 md:px-10 md:pb-32 md:pt-28">
             {children}
           </main>
         </div>
