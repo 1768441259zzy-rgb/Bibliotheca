@@ -1,0 +1,678 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-ink antialiased;
+    font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', 'Times New Roman',
+      Georgia, serif;
+  }
+
+  /* 阅读页：彻底关掉浏览器外层滚动轴 */
+  html.reading-space-lock,
+  html.reading-space-lock body {
+    overflow: hidden !important;
+    height: 100% !important;
+    overscroll-behavior: none;
+  }
+
+  html.reading-space-lock .site-bg {
+    min-height: 100% !important;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  html.reading-space-lock main {
+    overflow: hidden;
+    min-height: 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .font-display {
+    font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  }
+
+  .font-quote {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+  }
+
+  /* 顶部略深粉 → 由深到浅柔和过渡到复古纸色 */
+  .site-bg {
+    background:
+      linear-gradient(
+        to bottom,
+        #e6c8ba 0%,
+        #ebcfc2 8%,
+        #f0d8cc 18%,
+        #f3e2d6 30%,
+        #f5ebe0 45%,
+        #f6f0e6 65%,
+        #f7f3eb 100%
+      );
+  }
+}
+
+/* ========== 页面切换：慢离场 → 慢进场（书页翻阅感） ========== */
+.page-transition {
+  will-change: opacity, transform, filter;
+  view-transition-name: none;
+}
+
+.page-transition.page-leaving {
+  opacity: 0;
+  transform: translateY(-8px);
+  filter: blur(2px);
+  transition:
+    opacity 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95),
+    transform 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95),
+    filter 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  pointer-events: none;
+}
+
+@keyframes pageEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(3px);
+  }
+  45% {
+    opacity: 0.55;
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes pageReadingEnter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.page-anim-enter {
+  animation: pageEnter 1.45s cubic-bezier(0.33, 0.12, 0.18, 1) both;
+}
+
+.page-anim-reading {
+  animation: pageReadingEnter 0.95s cubic-bezier(0.33, 0.12, 0.18, 1) both;
+}
+
+/* ========== 站点小唱片（淡复古） ========== */
+.site-vinyl-disc {
+  background:
+    radial-gradient(
+      circle at 32% 28%,
+      rgba(255, 245, 230, 0.35) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      #d8c4a8 0%,
+      #c4ab8c 40%,
+      #a88f72 72%,
+      #8f7660 100%
+    );
+  box-shadow:
+    0 1px 0 rgba(255, 248, 238, 0.4) inset,
+    0 -1px 0 rgba(90, 70, 50, 0.12) inset,
+    0 2px 6px rgba(90, 70, 50, 0.14);
+}
+
+.site-vinyl-grooves {
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(90, 70, 50, 0.12) 0 1px,
+    rgba(255, 245, 230, 0.1) 1.2px 2.6px
+  );
+}
+
+.site-vinyl-label {
+  background:
+    radial-gradient(
+      circle at 40% 35%,
+      #f0e4d4 0%,
+      #e2d0b8 55%,
+      #cbb89a 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 110, 85, 0.2),
+    0 0 0 1px rgba(255, 248, 238, 0.25);
+}
+
+.site-vinyl-hole {
+  background: #6b5548;
+  box-shadow: inset 0 0 0 1px rgba(200, 180, 150, 0.25);
+}
+
+.site-vinyl:focus-visible {
+  outline: none;
+}
+
+.site-vinyl-disc.is-spinning {
+  animation: vinylSpin 3.6s linear infinite;
+}
+
+@keyframes vinylSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-vinyl-disc.is-spinning {
+    animation: none;
+  }
+}
+
+/* ========== 导航链接 ========== */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.65s cubic-bezier(0.33, 1, 0.32, 1);
+  opacity: 0.55;
+}
+
+.nav-link:hover::after,
+.nav-link-active::after {
+  transform: scaleX(1);
+}
+
+/* ========== 通用按键手感 ========== */
+.interactive-btn {
+  transition:
+    transform 0.5s cubic-bezier(0.33, 1, 0.32, 1),
+    background-color 0.5s ease,
+    border-color 0.5s ease,
+    box-shadow 0.5s ease,
+    opacity 0.5s ease;
+}
+
+.interactive-btn:hover {
+  transform: translateY(-1px);
+}
+
+.interactive-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop {
+  animation: modalBackdropIn 0.5s ease-out both;
+}
+
+.modal-panel {
+  animation: modalPanelIn 0.7s cubic-bezier(0.33, 1, 0.32, 1) both;
+}
+
+@keyframes handwriteIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em) rotate(-4deg) scale(0.96);
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+    filter: blur(0);
+  }
+}
+
+.handwrite-char {
+  display: inline-block;
+  opacity: 0;
+  animation: handwriteIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.handwrite-mark {
+  font-style: italic;
+}
+
+@keyframes lilySway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(1.6deg);
+  }
+  55% {
+    transform: rotate(-1.3deg);
+  }
+  80% {
+    transform: rotate(0.9deg);
+  }
+}
+
+@keyframes lilySwayRight {
+  0%,
+  100% {
+    transform: rotate(24deg);
+  }
+  25% {
+    transform: rotate(26.2deg);
+  }
+  55% {
+    transform: rotate(21.8deg);
+  }
+  80% {
+    transform: rotate(25deg);
+  }
+}
+
+.interactive-title {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+
+.interactive-title-inner {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.interactive-title-char {
+  display: inline-block;
+  transition:
+    transform 0.55s cubic-bezier(0.33, 1, 0.32, 1),
+    color 0.55s ease,
+    text-shadow 0.55s ease;
+  transition-delay: calc(var(--i, 0) * 28ms);
+}
+
+.interactive-title:hover .interactive-title-char {
+  color: #7a5a2e;
+  text-shadow: 0 1px 0 rgba(201, 168, 76, 0.35);
+  transform: translateY(-0.08em);
+}
+
+.interactive-title:hover .interactive-title-char:nth-child(odd) {
+  transform: translateY(-0.12em) rotate(-1.5deg);
+}
+
+.interactive-title:hover .interactive-title-char:nth-child(even) {
+  transform: translateY(-0.05em) rotate(1.2deg);
+}
+
+/* 烫金细线扫过 */
+.interactive-title-shine {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -0.18em;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #c9a84c 35%,
+    #e8d5a3 50%,
+    #c9a84c 65%,
+    transparent 100%
+  );
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0.75;
+  transition: transform 0.7s cubic-bezier(0.33, 1, 0.32, 1);
+}
+
+.interactive-title:hover .interactive-title-shine {
+  transform: scaleX(1);
+}
+
+/* Home 大标题：幅度稍大、节奏更慢 */
+.interactive-title-home:hover .interactive-title-char {
+  transition-duration: 0.7s;
+  transition-delay: calc(var(--i, 0) * 36ms);
+}
+
+.interactive-title-home:hover .interactive-title-char:nth-child(odd) {
+  transform: translateY(-0.16em) rotate(-2deg);
+}
+
+.interactive-title-home:hover .interactive-title-char:nth-child(even) {
+  transform: translateY(-0.08em) rotate(1.6deg);
+}
+
+/* Section 小标题 */
+.interactive-title-section:hover .interactive-title-char {
+  transition-delay: calc(var(--i, 0) * 22ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive-title-char,
+  .interactive-title-shine {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+.lily-sway {
+  cursor: default;
+}
+
+.lily-sway-top {
+  transform-origin: 20% 85%;
+}
+
+.lily-sway-left {
+  transform-origin: 15% 95%;
+}
+
+.lily-sway-right {
+  transform-origin: center center;
+}
+
+.lily-sway-right-wrap {
+  transform-origin: 100% 95%;
+}
+
+.lily-sway-top.is-swaying,
+.lily-sway-left.is-swaying {
+  animation: lilySway 4.2s ease-in-out infinite;
+}
+
+.lily-sway-right-wrap:has(.lily-sway-right.is-swaying),
+.lily-sway-right-wrap.is-swaying {
+  animation: lilySwayRight 4.2s ease-in-out infinite;
+}
+
+/* 首页两侧 books：轻柔悬浮 */
+@keyframes booksFloatLeft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  40% {
+    transform: translateY(-9px) rotate(-0.45deg);
+  }
+  70% {
+    transform: translateY(-5px) rotate(0.3deg);
+  }
+}
+
+@keyframes booksFloatRight {
+  0%,
+  100% {
+    transform: translateX(12px) translateY(0) rotate(0deg);
+  }
+  45% {
+    transform: translateX(12px) translateY(-10px) rotate(0.5deg);
+  }
+  75% {
+    transform: translateX(12px) translateY(-4px) rotate(-0.25deg);
+  }
+}
+
+.books-float {
+  will-change: transform;
+}
+
+.books-float-left {
+  transform: translateY(0);
+  transform-origin: 30% 90%;
+}
+
+.books-float-right {
+  transform: translateX(12px);
+  transform-origin: 70% 90%;
+}
+
+.books-float-left.is-floating {
+  animation: booksFloatLeft 3.8s ease-in-out infinite;
+}
+
+.books-float-right.is-floating {
+  animation: booksFloatRight 4.1s ease-in-out infinite;
+}
+
+/* Highlights 侧边悬浮目录 */
+.side-index-ornament {
+  transform: translateX(-4px);
+}
+
+.side-index-item:hover .side-index-ornament,
+.side-index-item:focus-visible .side-index-ornament {
+  transform: translateX(0);
+}
+
+.side-index-item {
+  border-left: 2px solid transparent;
+}
+
+.side-index-item:hover,
+.side-index-item:focus-visible {
+  border-left-color: rgba(139, 58, 42, 0.35);
+  padding-left: 0.95rem;
+}
+
+/* Guest Notes 扉页留言墙 · 横向自动滚动 */
+.guest-note {
+  background-image: linear-gradient(
+    180deg,
+    rgba(253, 251, 247, 0.95) 0%,
+    rgba(247, 235, 228, 0.72) 100%
+  );
+}
+
+.guest-note-seal {
+  opacity: 0.92;
+}
+
+/* Keep in Touch 盖印成功 */
+@keyframes sealStampIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.35) rotate(-12deg);
+    filter: blur(2px);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.96) rotate(2deg);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-4deg);
+    filter: blur(0);
+  }
+}
+
+.seal-stamp {
+  animation: sealStampIn 0.85s cubic-bezier(0.33, 1, 0.32, 1) both;
+}
+
+/* ========== Reading Space 沉浸书斋 ========== */
+.reading-space {
+  background: transparent;
+}
+
+.reading-scene-bg {
+  will-change: opacity;
+}
+
+/* 极轻暖罩，不挡书房图 */
+.reading-space-veil {
+  background: linear-gradient(
+    180deg,
+    rgba(253, 248, 240, 0.08) 0%,
+    rgba(92, 64, 51, 0.04) 100%
+  );
+}
+
+.reading-book-shell {
+  /* 透明度由底部「玻璃」滑杆控制 */
+  background-color: rgba(253, 251, 247, 0.4);
+}
+
+.reader-page {
+  background: rgba(253, 251, 247, 0.18);
+}
+
+.reader-scroll {
+  overscroll-behavior: contain;
+}
+
+.reader-prose,
+.epub-body {
+  color: #3d2a20;
+  line-height: 1.95;
+  font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  text-shadow: 0 0 12px rgba(253, 251, 247, 0.35);
+}
+
+.reader-prose p,
+.epub-body p {
+  margin: 0 0 1.15em;
+  text-indent: 2em;
+}
+
+.epub-body h1,
+.epub-body h2,
+.epub-body h3 {
+  font-family: 'Palatino Linotype', Palatino, Georgia, serif;
+  font-weight: 400;
+  text-align: center;
+  margin: 1.5em 0 1em;
+  color: #5c4033;
+}
+
+.vibe-slider {
+  accent-color: #8c6d58;
+  height: 0.25rem;
+}
+
+/* Reading Space — selection marks & popup */
+.mark.reading-mark,
+mark.reading-mark {
+  background-color: rgba(232, 196, 112, 0.55);
+  color: inherit;
+  border-radius: 0.1em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.05em 0;
+  cursor: text;
+}
+
+.selection-popup-caret {
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(44, 29, 17, 0.9);
+  border-right: 1px solid rgba(140, 109, 88, 0.5);
+  border-bottom: 1px solid rgba(140, 109, 88, 0.5);
+}
+
+.annotation-panel .annotation-slips {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 109, 88, 0.45) transparent;
+}
+
+.annotation-slip {
+  background:
+    linear-gradient(165deg, #faf3e8 0%, #f3e6d4 100%);
+}
+
+.reader-chrome-title {
+  color: #5c4033;
+}
+
+.reader-chrome-sub {
+  color: rgba(140, 109, 88, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-scene-bg {
+    transition: none !important;
+  }
+
+  .vibe-tab,
+  .vibe-console {
+    transition: none !important;
+  }
+
+  .page-transition,
+  .page-anim-enter,
+  .page-anim-reading,
+  .page-leaving,
+  .interactive-btn,
+  .nav-link::after,
+  .modal-backdrop,
+  .modal-panel {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .page-transition {
+    view-transition-name: none !important;
+  }
+
+  .handwrite-char {
+    opacity: 1 !important;
+    animation: none !important;
+    filter: none !important;
+    transform: none !important;
+  }
+
+  .lily-sway-top.is-swaying,
+  .lily-sway-left.is-swaying,
+  .lily-sway-right.is-swaying,
+  .lily-sway-right-wrap.is-swaying,
+  .lily-sway-right-wrap:has(.lily-sway-right.is-swaying),
+  .books-float-left.is-floating,
+  .books-float-right.is-floating {
+    animation: none !important;
+  }
+}
