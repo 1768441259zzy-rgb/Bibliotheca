@@ -8,6 +8,9 @@ interface CoverCardProps {
 }
 
 export default function CoverCard({ cover, onEdit, onDelete }: CoverCardProps) {
+  // Supabase Storage 等外链走直链，避免 Workers/边缘上的图片优化代理拦掉
+  const isRemote = /^https?:\/\//i.test(cover.imageUrl);
+
   return (
     <article className="group relative break-inside-avoid overflow-hidden rounded-sm bg-white/30 shadow-card transition-all duration-500 hover:-translate-y-1.5 hover:shadow-card-hover">
       <div className="relative aspect-[3/4] overflow-hidden">
@@ -16,6 +19,7 @@ export default function CoverCard({ cover, onEdit, onDelete }: CoverCardProps) {
           alt={cover.title ?? 'Book cover'}
           fill
           sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, 200px"
+          unoptimized={isRemote}
           className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
         />
 
