@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const MISTY_SRC = `/assets/sound/${encodeURIComponent(
-  'Ella Fitzgerald,Erroll Garner,Johnny Burke - Misty.flac'
+  'Ella Fitzgerald,Erroll Garner,Johnny Burke - Misty.mp3'
 )}`;
 
 export default function SiteVinylPlayer() {
