@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { revalidatePath } from 'next/cache';
 import type { BookCover } from '@/data/content';
 import {
   deleteCoverById,
-  ensureCoversDir,
   getAllCovers,
-  getCoversDir,
-  readUserCovers,
+  insertUserCover,
   updateCoverMeta,
-  writeUserCovers,
+  uploadCoverImage,
 } from '@/lib/covers';
 
 export const runtime = 'nodejs';
@@ -29,9 +25,23 @@ const EXT_BY_TYPE: Record<string, string> = {
   'image/gif': '.gif',
 };
 
+function extForFile(file: File): string {
+  return (
+    EXT_BY_TYPE[file.type] ||
+    (file.name.includes('.')
+      ? `.${file.name.split('.').pop()!.toLowerCase()}`
+      : '.jpg')
+  );
+}
+
 export async function GET() {
-  const covers = await getAllCovers();
-  return NextResponse.json({ covers });
+  try {
+    const covers = await getAllCovers();
+    return NextResponse.json({ covers });
+  } catch (error) {
+    console.error('List covers failed:', error);
+    return NextResponse.json({ error: '读取封面失败' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -57,18 +67,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '图片请控制在 8MB 以内' }, { status: 400 });
     }
 
-    await ensureCoversDir();
-
     const id = `u${Date.now()}`;
-    const ext =
-      EXT_BY_TYPE[file.type] ||
-      path.extname(file.name).toLowerCase() ||
-      '.jpg';
-    const filename = `cover-${id}${ext}`;
-    const filepath = path.join(getCoversDir(), filename);
-
+    const ext = extForFile(file);
+    const objectPath = `cover-${id}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filepath, buffer);
+    const imageUrl = await uploadCoverImage(objectPath, buffer, file.type);
 
     const tags = tagsRaw
       ? tagsRaw
@@ -79,19 +82,17 @@ export async function POST(request: Request) {
 
     const cover: BookCover = {
       id,
-      imageUrl: `/assets/covers/${filename}`,
+      imageUrl,
       ...(title ? { title } : {}),
       ...(designer ? { designer } : {}),
       ...(tags && tags.length ? { tags } : {}),
     };
 
-    const userCovers = await readUserCovers();
-    userCovers.push(cover);
-    await writeUserCovers(userCovers);
+    const saved = await insertUserCover(cover);
 
     revalidatePath('/cover-art');
 
-    return NextResponse.json({ cover });
+    return NextResponse.json({ cover: saved });
   } catch (error) {
     console.error('Upload cover failed:', error);
     return NextResponse.json({ error: '上传失败，请稍后重试' }, { status: 500 });
@@ -131,16 +132,10 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: '图片请控制在 8MB 以内' }, { status: 400 });
       }
 
-      await ensureCoversDir();
-      const ext =
-        EXT_BY_TYPE[file.type] ||
-        path.extname(file.name).toLowerCase() ||
-        '.jpg';
-      const filename = `cover-${id}-${Date.now()}${ext}`;
-      const filepath = path.join(getCoversDir(), filename);
+      const ext = extForFile(file);
+      const objectPath = `cover-${id}-${Date.now()}${ext}`;
       const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(filepath, buffer);
-      imageUrl = `/assets/covers/${filename}`;
+      imageUrl = await uploadCoverImage(objectPath, buffer, file.type);
     }
 
     const cover = await updateCoverMeta(id, {

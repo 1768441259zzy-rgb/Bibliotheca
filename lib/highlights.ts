@@ -1,14 +1,5 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { highlightGroups, type HighlightGroup } from '@/data/content';
-
-const USER_PATH = path.join(process.cwd(), 'data', 'user-highlights.json');
-const OVERRIDES_PATH = path.join(
-  process.cwd(),
-  'data',
-  'highlight-overrides.json'
-);
-const DELETED_PATH = path.join(process.cwd(), 'data', 'deleted-highlights.json');
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 
 type HighlightOverride = {
   bookTitle?: string;
@@ -16,54 +7,45 @@ type HighlightOverride = {
   quotes?: string[];
 };
 
-export async function readUserHighlights(): Promise<HighlightGroup[]> {
-  try {
-    const raw = await fs.readFile(USER_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as HighlightGroup[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+interface UserHighlightRow {
+  id: string;
+  book_title: string;
+  author: string | null;
+  quotes: unknown;
+}
+
+interface HighlightOverrideRow {
+  id: string;
+  book_title: string | null;
+  author: string | null;
+  quotes: unknown;
+}
+
+function parseQuotes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((q) => String(q ?? '').trim()).filter(Boolean);
+}
+
+function rowToGroup(row: UserHighlightRow): HighlightGroup {
+  const group: HighlightGroup = {
+    id: row.id,
+    bookTitle: row.book_title,
+    quotes: parseQuotes(row.quotes),
+  };
+  if (row.author) group.author = row.author;
+  return group;
+}
+
+function overrideFromRow(row: HighlightOverrideRow): HighlightOverride {
+  const override: HighlightOverride = {};
+  if (row.book_title) override.bookTitle = row.book_title;
+  if (row.author !== null && row.author !== undefined) {
+    override.author = row.author;
   }
-}
-
-export async function writeUserHighlights(
-  groups: HighlightGroup[]
-): Promise<void> {
-  await fs.writeFile(USER_PATH, JSON.stringify(groups, null, 2) + '\n', 'utf-8');
-}
-
-async function readOverrides(): Promise<Record<string, HighlightOverride>> {
-  try {
-    const raw = await fs.readFile(OVERRIDES_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as Record<string, HighlightOverride>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
+  if (row.quotes !== null && row.quotes !== undefined) {
+    override.quotes = parseQuotes(row.quotes);
   }
-}
-
-async function writeOverrides(
-  overrides: Record<string, HighlightOverride>
-): Promise<void> {
-  await fs.writeFile(
-    OVERRIDES_PATH,
-    JSON.stringify(overrides, null, 2) + '\n',
-    'utf-8'
-  );
-}
-
-async function readDeletedIds(): Promise<string[]> {
-  try {
-    const raw = await fs.readFile(DELETED_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeDeletedIds(ids: string[]): Promise<void> {
-  await fs.writeFile(DELETED_PATH, JSON.stringify(ids, null, 2) + '\n', 'utf-8');
+  return override;
 }
 
 function applyOverride(
@@ -98,6 +80,96 @@ function buildGroup(
   };
   if (meta.author?.trim()) group.author = meta.author.trim();
   return group;
+}
+
+export async function readUserHighlights(): Promise<HighlightGroup[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_highlights')
+    .select('id, book_title, author, quotes')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('readUserHighlights failed:', error);
+    throw new Error(error.message);
+  }
+
+  return (data as UserHighlightRow[] | null)?.map(rowToGroup) ?? [];
+}
+
+export async function insertUserHighlight(
+  group: HighlightGroup
+): Promise<HighlightGroup> {
+  const supabase = getSupabaseAdmin();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('user_highlights')
+    .insert({
+      id: group.id,
+      book_title: group.bookTitle,
+      author: group.author ?? null,
+      quotes: group.quotes,
+      created_at: now,
+      updated_at: now,
+    })
+    .select('id, book_title, author, quotes')
+    .single();
+
+  if (error) {
+    console.error('insertUserHighlight failed:', error);
+    throw new Error(error.message);
+  }
+
+  return rowToGroup(data as UserHighlightRow);
+}
+
+export async function findUserHighlightByTitle(
+  bookTitle: string
+): Promise<HighlightGroup | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_highlights')
+    .select('id, book_title, author, quotes')
+    .eq('book_title', bookTitle)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('findUserHighlightByTitle failed:', error);
+    throw new Error(error.message);
+  }
+
+  return data ? rowToGroup(data as UserHighlightRow) : null;
+}
+
+async function readOverrides(): Promise<Record<string, HighlightOverride>> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('highlight_overrides')
+    .select('id, book_title, author, quotes');
+
+  if (error) {
+    console.error('readHighlightOverrides failed:', error);
+    throw new Error(error.message);
+  }
+
+  const map: Record<string, HighlightOverride> = {};
+  for (const row of (data as HighlightOverrideRow[] | null) ?? []) {
+    map[row.id] = overrideFromRow(row);
+  }
+  return map;
+}
+
+async function readDeletedIds(): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from('deleted_highlights').select('id');
+
+  if (error) {
+    console.error('readDeletedHighlights failed:', error);
+    throw new Error(error.message);
+  }
+
+  return ((data as { id: string }[] | null) ?? []).map((r) => r.id);
 }
 
 export async function getAllHighlights(): Promise<HighlightGroup[]> {
@@ -135,26 +207,50 @@ async function findGroup(id: string): Promise<HighlightGroup | null> {
 }
 
 async function persistGroup(next: HighlightGroup): Promise<HighlightGroup> {
+  const supabase = getSupabaseAdmin();
   const userHighlights = await readUserHighlights();
-  const userIndex = userHighlights.findIndex((g) => g.id === next.id);
+  const isUser = userHighlights.some((g) => g.id === next.id);
 
-  if (userIndex >= 0) {
-    userHighlights[userIndex] = next;
-    await writeUserHighlights(userHighlights);
-    return next;
+  if (isUser) {
+    const { data, error } = await supabase
+      .from('user_highlights')
+      .update({
+        book_title: next.bookTitle,
+        author: next.author ?? null,
+        quotes: next.quotes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', next.id)
+      .select('id, book_title, author, quotes')
+      .single();
+
+    if (error) {
+      console.error('persistGroup user failed:', error);
+      throw new Error(error.message);
+    }
+
+    return rowToGroup(data as UserHighlightRow);
   }
 
   const builtin = highlightGroups.find((g) => g.id === next.id);
   if (!builtin) throw new Error('not found');
 
-  const overrides = await readOverrides();
-  const clean: HighlightOverride = {
-    bookTitle: next.bookTitle,
-    quotes: next.quotes,
-    author: next.author ?? '',
-  };
-  overrides[next.id] = clean;
-  await writeOverrides(overrides);
+  const { error } = await supabase.from('highlight_overrides').upsert(
+    {
+      id: next.id,
+      book_title: next.bookTitle,
+      author: next.author ?? '',
+      quotes: next.quotes,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) {
+    console.error('persistGroup override failed:', error);
+    throw new Error(error.message);
+  }
+
   return next;
 }
 
@@ -221,29 +317,45 @@ export async function deleteHighlightQuote(
 }
 
 export async function deleteHighlightGroup(id: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
   const userHighlights = await readUserHighlights();
-  const userIndex = userHighlights.findIndex((g) => g.id === id);
+  const isUser = userHighlights.some((g) => g.id === id);
 
-  if (userIndex >= 0) {
-    userHighlights.splice(userIndex, 1);
-    await writeUserHighlights(userHighlights);
+  if (isUser) {
+    const { error } = await supabase.from('user_highlights').delete().eq('id', id);
+    if (error) {
+      console.error('deleteHighlightGroup user failed:', error);
+      throw new Error(error.message);
+    }
     return true;
   }
 
   const builtin = highlightGroups.find((g) => g.id === id);
   if (!builtin) return false;
 
-  const deleted = await readDeletedIds();
-  if (!deleted.includes(id)) {
-    deleted.push(id);
-    await writeDeletedIds(deleted);
+  const { error: delError } = await supabase
+    .from('deleted_highlights')
+    .upsert({ id }, { onConflict: 'id' });
+  if (delError) {
+    console.error('deleteHighlightGroup mark deleted failed:', delError);
+    throw new Error(delError.message);
   }
 
-  const overrides = await readOverrides();
-  if (overrides[id]) {
-    delete overrides[id];
-    await writeOverrides(overrides);
+  const { error: ovError } = await supabase
+    .from('highlight_overrides')
+    .delete()
+    .eq('id', id);
+  if (ovError) {
+    console.error('deleteHighlightGroup clear override failed:', ovError);
+    throw new Error(ovError.message);
   }
 
   return true;
+}
+
+/** @deprecated 已改为 insertUserHighlight / persist 单条更新 */
+export async function writeUserHighlights(
+  _groups: HighlightGroup[]
+): Promise<void> {
+  throw new Error('writeUserHighlights 已停用，请使用 insertUserHighlight');
 }

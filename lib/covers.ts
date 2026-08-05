@@ -1,62 +1,39 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { bookCovers, type BookCover } from '@/data/content';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
 
-const USER_COVERS_PATH = path.join(process.cwd(), 'data', 'user-covers.json');
-const OVERRIDES_PATH = path.join(process.cwd(), 'data', 'cover-overrides.json');
-const DELETED_PATH = path.join(process.cwd(), 'data', 'deleted-covers.json');
-const COVERS_DIR = path.join(process.cwd(), 'public', 'assets', 'covers');
+const BUCKET = 'covers';
 
-export async function readUserCovers(): Promise<BookCover[]> {
-  try {
-    const raw = await fs.readFile(USER_COVERS_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as BookCover[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+interface UserCoverRow {
+  id: string;
+  image_url: string;
+  title: string | null;
+  designer: string | null;
+  tags: string[] | null;
 }
 
-export async function writeUserCovers(covers: BookCover[]): Promise<void> {
-  await fs.writeFile(
-    USER_COVERS_PATH,
-    JSON.stringify(covers, null, 2) + '\n',
-    'utf-8'
-  );
+interface CoverOverrideRow {
+  id: string;
+  title: string | null;
+  designer: string | null;
+  tags: string[] | null;
+  image_url: string | null;
 }
 
-async function readOverrides(): Promise<Record<string, Partial<BookCover>>> {
-  try {
-    const raw = await fs.readFile(OVERRIDES_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as Record<string, Partial<BookCover>>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+function rowToCover(row: UserCoverRow): BookCover {
+  const cover: BookCover = { id: row.id, imageUrl: row.image_url };
+  if (row.title) cover.title = row.title;
+  if (row.designer) cover.designer = row.designer;
+  if (row.tags?.length) cover.tags = row.tags;
+  return cover;
 }
 
-async function writeOverrides(
-  overrides: Record<string, Partial<BookCover>>
-): Promise<void> {
-  await fs.writeFile(
-    OVERRIDES_PATH,
-    JSON.stringify(overrides, null, 2) + '\n',
-    'utf-8'
-  );
-}
-
-async function readDeletedIds(): Promise<string[]> {
-  try {
-    const raw = await fs.readFile(DELETED_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeDeletedIds(ids: string[]): Promise<void> {
-  await fs.writeFile(DELETED_PATH, JSON.stringify(ids, null, 2) + '\n', 'utf-8');
+function overrideToPartial(row: CoverOverrideRow): Partial<BookCover> {
+  const partial: Partial<BookCover> = {};
+  if (row.title) partial.title = row.title;
+  if (row.designer) partial.designer = row.designer;
+  if (row.tags?.length) partial.tags = row.tags;
+  if (row.image_url) partial.imageUrl = row.image_url;
+  return partial;
 }
 
 function applyOverride(
@@ -84,6 +61,80 @@ function buildCover(
   return cover;
 }
 
+function storageObjectPathFromUrl(imageUrl: string): string | null {
+  const marker = `/storage/v1/object/public/${BUCKET}/`;
+  const idx = imageUrl.indexOf(marker);
+  if (idx >= 0) return decodeURIComponent(imageUrl.slice(idx + marker.length));
+  return null;
+}
+
+export async function readUserCovers(): Promise<BookCover[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_covers')
+    .select('id, image_url, title, designer, tags')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('readUserCovers failed:', error);
+    throw new Error(error.message);
+  }
+
+  return (data as UserCoverRow[] | null)?.map(rowToCover) ?? [];
+}
+
+export async function insertUserCover(cover: BookCover): Promise<BookCover> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('user_covers')
+    .insert({
+      id: cover.id,
+      image_url: cover.imageUrl,
+      title: cover.title ?? null,
+      designer: cover.designer ?? null,
+      tags: cover.tags ?? [],
+    })
+    .select('id, image_url, title, designer, tags')
+    .single();
+
+  if (error) {
+    console.error('insertUserCover failed:', error);
+    throw new Error(error.message);
+  }
+
+  return rowToCover(data as UserCoverRow);
+}
+
+async function readOverrides(): Promise<Record<string, Partial<BookCover>>> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('cover_overrides')
+    .select('id, title, designer, tags, image_url');
+
+  if (error) {
+    console.error('readCoverOverrides failed:', error);
+    throw new Error(error.message);
+  }
+
+  const map: Record<string, Partial<BookCover>> = {};
+  for (const row of (data as CoverOverrideRow[] | null) ?? []) {
+    map[row.id] = overrideToPartial(row);
+  }
+  return map;
+}
+
+async function readDeletedIds(): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from('deleted_covers').select('id');
+
+  if (error) {
+    console.error('readDeletedCovers failed:', error);
+    throw new Error(error.message);
+  }
+
+  return ((data as { id: string }[] | null) ?? []).map((r) => r.id);
+}
+
 export async function getAllCovers(): Promise<BookCover[]> {
   const [userCovers, overrides, deleted] = await Promise.all([
     readUserCovers(),
@@ -103,6 +154,37 @@ export async function getAllCovers(): Promise<BookCover[]> {
   return [...builtin, ...users];
 }
 
+export async function uploadCoverImage(
+  objectPath: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.storage.from(BUCKET).upload(objectPath, buffer, {
+    contentType,
+    upsert: true,
+  });
+
+  if (error) {
+    console.error('uploadCoverImage failed:', error);
+    throw new Error(error.message);
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(objectPath);
+  return data.publicUrl;
+}
+
+export async function removeCoverImageIfStored(imageUrl: string): Promise<void> {
+  const objectPath = storageObjectPathFromUrl(imageUrl);
+  if (!objectPath) return;
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.storage.from(BUCKET).remove([objectPath]);
+  if (error) {
+    console.error('removeCoverImageIfStored failed:', error);
+  }
+}
+
 export async function updateCoverMeta(
   id: string,
   meta: {
@@ -112,6 +194,7 @@ export async function updateCoverMeta(
     imageUrl?: string;
   }
 ): Promise<BookCover | null> {
+  const supabase = getSupabaseAdmin();
   const userCovers = await readUserCovers();
   const userIndex = userCovers.findIndex((c) => c.id === id);
 
@@ -122,9 +205,29 @@ export async function updateCoverMeta(
       designer: meta.designer !== undefined ? meta.designer : current.designer,
       tags: meta.tags !== undefined ? meta.tags : current.tags,
     });
-    userCovers[userIndex] = next;
-    await writeUserCovers(userCovers);
-    return next;
+
+    if (meta.imageUrl && current.imageUrl !== meta.imageUrl) {
+      await removeCoverImageIfStored(current.imageUrl);
+    }
+
+    const { data, error } = await supabase
+      .from('user_covers')
+      .update({
+        image_url: next.imageUrl,
+        title: next.title ?? null,
+        designer: next.designer ?? null,
+        tags: next.tags ?? [],
+      })
+      .eq('id', id)
+      .select('id, image_url, title, designer, tags')
+      .single();
+
+    if (error) {
+      console.error('updateCoverMeta user failed:', error);
+      throw new Error(error.message);
+    }
+
+    return rowToCover(data as UserCoverRow);
   }
 
   const builtin = bookCovers.find((c) => c.id === id);
@@ -146,55 +249,85 @@ export async function updateCoverMeta(
     if (meta.tags.length) nextOverride.tags = meta.tags;
     else delete nextOverride.tags;
   }
-  if (meta.imageUrl) nextOverride.imageUrl = meta.imageUrl;
+  if (meta.imageUrl) {
+    if (prev.imageUrl && prev.imageUrl !== meta.imageUrl) {
+      await removeCoverImageIfStored(prev.imageUrl);
+    }
+    nextOverride.imageUrl = meta.imageUrl;
+  }
 
-  overrides[id] = nextOverride;
-  await writeOverrides(overrides);
+  const { error } = await supabase.from('cover_overrides').upsert(
+    {
+      id,
+      title: nextOverride.title ?? null,
+      designer: nextOverride.designer ?? null,
+      tags: nextOverride.tags ?? null,
+      image_url: nextOverride.imageUrl ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) {
+    console.error('updateCoverMeta override failed:', error);
+    throw new Error(error.message);
+  }
+
   return applyOverride(builtin, nextOverride);
 }
 
 export async function deleteCoverById(id: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
   const userCovers = await readUserCovers();
-  const userIndex = userCovers.findIndex((c) => c.id === id);
+  const user = userCovers.find((c) => c.id === id);
 
-  if (userIndex >= 0) {
-    const [removed] = userCovers.splice(userIndex, 1);
-    await writeUserCovers(userCovers);
-
-    if (removed.imageUrl?.startsWith('/assets/covers/')) {
-      const filename = removed.imageUrl.replace('/assets/covers/', '');
-      const filepath = path.join(COVERS_DIR, filename);
-      try {
-        await fs.unlink(filepath);
-      } catch {
-        // ignore missing file
-      }
+  if (user) {
+    const { error } = await supabase.from('user_covers').delete().eq('id', id);
+    if (error) {
+      console.error('deleteCoverById user failed:', error);
+      throw new Error(error.message);
     }
+    await removeCoverImageIfStored(user.imageUrl);
     return true;
   }
 
   const builtin = bookCovers.find((c) => c.id === id);
   if (!builtin) return false;
 
-  const deleted = await readDeletedIds();
-  if (!deleted.includes(id)) {
-    deleted.push(id);
-    await writeDeletedIds(deleted);
+  const { error: delError } = await supabase
+    .from('deleted_covers')
+    .upsert({ id }, { onConflict: 'id' });
+  if (delError) {
+    console.error('deleteCoverById mark deleted failed:', delError);
+    throw new Error(delError.message);
   }
 
   const overrides = await readOverrides();
-  if (overrides[id]) {
-    delete overrides[id];
-    await writeOverrides(overrides);
+  if (overrides[id]?.imageUrl) {
+    await removeCoverImageIfStored(overrides[id].imageUrl!);
+  }
+
+  const { error: ovError } = await supabase
+    .from('cover_overrides')
+    .delete()
+    .eq('id', id);
+  if (ovError) {
+    console.error('deleteCoverById clear override failed:', ovError);
+    throw new Error(ovError.message);
   }
 
   return true;
 }
 
-export async function ensureCoversDir(): Promise<void> {
-  await fs.mkdir(COVERS_DIR, { recursive: true });
+/** @deprecated 本地目录已停用；保留空实现避免旧引用报错 */
+export async function ensureCoversDir(): Promise<void> {}
+
+/** @deprecated */
+export function getCoversDir(): string {
+  return '';
 }
 
-export function getCoversDir(): string {
-  return COVERS_DIR;
+/** @deprecated 已改为 insertUserCover */
+export async function writeUserCovers(_covers: BookCover[]): Promise<void> {
+  throw new Error('writeUserCovers 已停用，请使用 insertUserCover');
 }

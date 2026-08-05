@@ -4,18 +4,23 @@ import type { HighlightGroup } from '@/data/content';
 import {
   deleteHighlightGroup,
   deleteHighlightQuote,
+  findUserHighlightByTitle,
   getAllHighlights,
-  readUserHighlights,
+  insertUserHighlight,
   updateHighlightGroup,
   updateHighlightQuote,
-  writeUserHighlights,
 } from '@/lib/highlights';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const highlights = await getAllHighlights();
-  return NextResponse.json({ highlights });
+  try {
+    const highlights = await getAllHighlights();
+    return NextResponse.json({ highlights });
+  } catch (error) {
+    console.error('List highlights failed:', error);
+    return NextResponse.json({ error: '读取摘抄失败' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -43,25 +48,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '请至少添加一句摘抄' }, { status: 400 });
     }
 
-    const userHighlights = await readUserHighlights();
-
     if (mergeByTitle) {
-      const existingIdx = userHighlights.findIndex(
-        (g) => g.bookTitle === bookTitle
-      );
-      if (existingIdx >= 0) {
-        const existing = userHighlights[existingIdx];
+      const existing = await findUserHighlightByTitle(bookTitle);
+      if (existing) {
         const mergedQuotes = [...existing.quotes];
         for (const q of quotes) {
           if (!mergedQuotes.includes(q)) mergedQuotes.push(q);
         }
-        const group: HighlightGroup = {
-          ...existing,
+        const group = await updateHighlightGroup(existing.id, {
+          bookTitle: existing.bookTitle,
+          author: author || existing.author,
           quotes: mergedQuotes,
-          ...(author ? { author } : {}),
-        };
-        userHighlights[existingIdx] = group;
-        await writeUserHighlights(userHighlights);
+        });
+        if (!group) {
+          return NextResponse.json({ error: '合并失败' }, { status: 500 });
+        }
         revalidatePath('/highlights');
         return NextResponse.json({ group, merged: true });
       }
@@ -74,12 +75,11 @@ export async function POST(request: Request) {
       ...(author ? { author } : {}),
     };
 
-    userHighlights.push(group);
-    await writeUserHighlights(userHighlights);
+    const saved = await insertUserHighlight(group);
 
     revalidatePath('/highlights');
 
-    return NextResponse.json({ group, merged: false });
+    return NextResponse.json({ group: saved, merged: false });
   } catch (error) {
     console.error('Add highlight failed:', error);
     return NextResponse.json({ error: '保存失败，请稍后重试' }, { status: 500 });
