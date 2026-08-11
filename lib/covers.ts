@@ -145,9 +145,10 @@ async function readCoverOrderIds(): Promise<string[]> {
     .eq('id', 'default')
     .maybeSingle();
 
+  // 表尚未创建时不阻断整站，按默认顺序展示
   if (error) {
     console.error('readCoverOrderIds failed:', error);
-    throw new Error(error.message);
+    return [];
   }
 
   const ids = (data as { cover_ids?: string[] } | null)?.cover_ids;
@@ -215,23 +216,29 @@ async function removeCoverFromOrder(id: string): Promise<void> {
 }
 
 export async function getAllCovers(): Promise<BookCover[]> {
-  const [userCovers, overrides, deleted, orderIds] = await Promise.all([
-    readUserCovers(),
-    readOverrides(),
-    readDeletedIds(),
-    readCoverOrderIds(),
-  ]);
-  const deletedSet = new Set(deleted);
+  try {
+    const [userCovers, overrides, deleted, orderIds] = await Promise.all([
+      readUserCovers(),
+      readOverrides(),
+      readDeletedIds(),
+      readCoverOrderIds(),
+    ]);
+    const deletedSet = new Set(deleted);
 
-  const builtin = bookCovers
-    .filter((c) => !deletedSet.has(c.id))
-    .map((c) => applyOverride(c, overrides[c.id]));
+    const builtin = bookCovers
+      .filter((c) => !deletedSet.has(c.id))
+      .map((c) => applyOverride(c, overrides[c.id]));
 
-  const users = userCovers
-    .filter((c) => !deletedSet.has(c.id))
-    .map((c) => applyOverride(c, overrides[c.id]));
+    const users = userCovers
+      .filter((c) => !deletedSet.has(c.id))
+      .map((c) => applyOverride(c, overrides[c.id]));
 
-  return applyCoverOrder([...builtin, ...users], orderIds);
+    return applyCoverOrder([...builtin, ...users], orderIds);
+  } catch (error) {
+    // 避免 Vercel 因 Supabase/排序表未就绪而整页 500
+    console.error('getAllCovers fallback to builtins:', error);
+    return [...bookCovers];
+  }
 }
 
 export async function uploadCoverImage(

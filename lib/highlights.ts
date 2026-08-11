@@ -173,22 +173,27 @@ async function readDeletedIds(): Promise<string[]> {
 }
 
 export async function getAllHighlights(): Promise<HighlightGroup[]> {
-  const [userHighlights, overrides, deleted] = await Promise.all([
-    readUserHighlights(),
-    readOverrides(),
-    readDeletedIds(),
-  ]);
-  const deletedSet = new Set(deleted);
+  try {
+    const [userHighlights, overrides, deleted] = await Promise.all([
+      readUserHighlights(),
+      readOverrides(),
+      readDeletedIds(),
+    ]);
+    const deletedSet = new Set(deleted);
 
-  const builtin = highlightGroups
-    .filter((g) => !deletedSet.has(g.id))
-    .map((g) => applyOverride(g, overrides[g.id]));
+    const builtin = highlightGroups
+      .filter((g) => !deletedSet.has(g.id))
+      .map((g) => applyOverride(g, overrides[g.id]));
 
-  const users = userHighlights
-    .filter((g) => !deletedSet.has(g.id))
-    .map((g) => applyOverride(g, overrides[g.id]));
+    const users = userHighlights
+      .filter((g) => !deletedSet.has(g.id))
+      .map((g) => applyOverride(g, overrides[g.id]));
 
-  return [...builtin, ...users];
+    return [...builtin, ...users];
+  } catch (error) {
+    console.error('getAllHighlights fallback to builtins:', error);
+    return [...highlightGroups];
+  }
 }
 
 async function findGroup(id: string): Promise<HighlightGroup | null> {

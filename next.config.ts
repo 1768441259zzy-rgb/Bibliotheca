@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['pdfjs-dist'],
@@ -15,6 +16,11 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-// Cloudflare OpenNext：本地 next dev 时接入 bindings
-import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
-initOpenNextCloudflareForDev();
+// 仅本地 next dev；Vercel / CI 上不要初始化 Cloudflare 模拟环境
+if (
+  process.env.NODE_ENV === 'development' &&
+  !process.env.VERCEL &&
+  !process.env.CI
+) {
+  initOpenNextCloudflareForDev();
+}
