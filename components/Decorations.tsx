@@ -275,10 +275,10 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 首页左侧大百合 */}
+      {/* 首页左侧大百合：手机缩小，避免占满半屏 */}
       {homeLilyLeft && (
         <div
-          className="pointer-events-none fixed bottom-0 left-0 z-[16] h-[calc(100vh-5.5rem)] w-auto max-w-[55vw] origin-bottom-left -rotate-[20deg]"
+          className="pointer-events-none fixed bottom-0 left-0 z-[16] h-[min(48vh,calc(100vh-7rem))] w-auto max-w-[32vw] origin-bottom-left -rotate-[18deg] sm:h-[min(62vh,calc(100vh-6rem))] sm:max-w-[40vw] sm:-rotate-[20deg] md:h-[calc(100vh-5.5rem)] md:max-w-[55vw]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -390,11 +390,15 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 底部信封：About 上压过百合与满天星 */}
+      {/* 底部信封：About 上压过百合与满天星；手机上放大到约占屏高 1/4+ */}
       {!hideEnvelope && (
         <div
-          className={`pointer-events-none fixed bottom-0 left-0 w-full transition-opacity duration-150 ${
+          className={`pointer-events-none fixed bottom-0 left-0 w-full origin-bottom transition-opacity duration-150 ${
             isAbout ? 'z-40' : 'z-10'
+          } ${
+            pathname === '/'
+              ? 'min-h-[28vh] scale-[1.35] sm:min-h-[24vh] sm:scale-[1.15] md:min-h-0 md:scale-100'
+              : ''
           }`}
           style={{ opacity: isAbout ? envelopeOpacity : 1 }}
           aria-hidden="true"
@@ -405,7 +409,11 @@ export default function Decorations() {
             alt=""
             width={1672}
             height={941}
-            className="h-auto w-full object-cover object-bottom mix-blend-screen"
+            className={`w-full object-cover object-bottom mix-blend-screen ${
+              pathname === '/'
+                ? 'h-full min-h-[28vh] sm:min-h-[24vh] md:h-auto md:min-h-0'
+                : 'h-auto'
+            }`}
           />
         </div>
       )}
