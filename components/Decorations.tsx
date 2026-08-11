@@ -275,10 +275,10 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 首页左侧大百合：手机缩小，避免占满半屏 */}
+      {/* 首页左侧百合：手机明显缩小，并压到正文下方，避免挡住引言 */}
       {homeLilyLeft && (
         <div
-          className="pointer-events-none fixed bottom-0 left-0 z-[16] h-[min(48vh,calc(100vh-7rem))] w-auto max-w-[32vw] origin-bottom-left -rotate-[18deg] sm:h-[min(62vh,calc(100vh-6rem))] sm:max-w-[40vw] sm:-rotate-[20deg] md:h-[calc(100vh-5.5rem)] md:max-w-[55vw]"
+          className="pointer-events-none fixed bottom-[-4%] left-[-18%] z-[5] h-[34vh] w-[46vw] origin-bottom-left -rotate-[14deg] sm:bottom-0 sm:left-[-8%] sm:h-[48vh] sm:w-[38vw] sm:-rotate-[18deg] md:left-0 md:h-[calc(100vh-5.5rem)] md:w-auto md:max-w-[55vw] md:-rotate-[20deg]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -288,7 +288,7 @@ export default function Decorations() {
             width={1536}
             height={1024}
             data-hit="left"
-            className="lily-sway lily-sway-left h-full w-auto max-w-none object-contain object-left-bottom mix-blend-screen"
+            className="lily-sway lily-sway-left h-full w-full object-contain object-left-bottom mix-blend-screen md:w-auto md:max-w-none"
           />
         </div>
       )}
@@ -335,10 +335,10 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 首页 books */}
+      {/* 首页 books：手机略收，并压到正文下方 */}
       {showBooks && (
         <div
-          className="pointer-events-none fixed bottom-[calc(7%-2mm)] left-0 right-0 z-[15] w-screen origin-bottom scale-[1.08] sm:bottom-[calc(8%-2mm)] md:bottom-[calc(9%-2mm)]"
+          className="pointer-events-none fixed bottom-[calc(7%-2mm)] left-0 right-0 z-[6] w-screen origin-bottom scale-[0.92] sm:bottom-[calc(8%-2mm)] sm:scale-[1.02] md:bottom-[calc(9%-2mm)] md:scale-[1.08]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -390,14 +390,14 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 底部信封：About 上压过百合与满天星；手机上放大到约占屏高 1/4+ */}
+      {/* 底部信封：手机裁切放大粉色区域，约占屏高 1/4 */}
       {!hideEnvelope && (
         <div
           className={`pointer-events-none fixed bottom-0 left-0 w-full origin-bottom transition-opacity duration-150 ${
-            isAbout ? 'z-40' : 'z-10'
+            isAbout ? 'z-40' : 'z-[4]'
           } ${
             pathname === '/'
-              ? 'min-h-[28vh] scale-[1.35] sm:min-h-[24vh] sm:scale-[1.15] md:min-h-0 md:scale-100'
+              ? 'h-[30vh] overflow-hidden sm:h-[26vh] md:h-auto md:overflow-visible'
               : ''
           }`}
           style={{ opacity: isAbout ? envelopeOpacity : 1 }}
@@ -409,10 +409,10 @@ export default function Decorations() {
             alt=""
             width={1672}
             height={941}
-            className={`w-full object-cover object-bottom mix-blend-screen ${
+            className={`w-full mix-blend-screen ${
               pathname === '/'
-                ? 'h-full min-h-[28vh] sm:min-h-[24vh] md:h-auto md:min-h-0'
-                : 'h-auto'
+                ? 'absolute bottom-0 left-1/2 h-[240%] max-w-none -translate-x-1/2 object-cover object-bottom sm:h-[200%] md:relative md:left-0 md:h-auto md:w-full md:translate-x-0 md:object-cover'
+                : 'h-auto object-cover object-bottom'
             }`}
           />
         </div>
