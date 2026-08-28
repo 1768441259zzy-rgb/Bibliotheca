@@ -42,18 +42,14 @@ export default function Navbar() {
       }`}
     >
       {/* 全站只挂一个唱片，避免桌面/手机各一份导致暂停失效 */}
-      <div
-        className={`pointer-events-auto absolute right-4 top-3.5 z-[71] md:right-8 md:top-8 ${
-          onReading ? '' : ''
-        }`}
-      >
+      <div className="pointer-events-auto absolute right-4 top-3.5 z-[71] md:right-8 md:top-8">
         <SiteVinylPlayer autoplayEnabled={onHome} />
       </div>
 
-      {/* —— 桌面导航（居中；唱片仍在右上角） —— */}
-      <div className="hidden items-center justify-center px-10 py-8 md:flex">
+      {/* —— 桌面：整组导航靠右；唱片留在右上角 —— */}
+      <div className="hidden items-center justify-end px-10 py-8 pr-[4.25rem] md:flex">
         <ul
-          className={`flex flex-wrap items-center justify-center gap-x-5 text-sm tracking-[0.25em] text-ink-light ${
+          className={`flex flex-wrap items-center justify-end gap-x-5 text-sm tracking-[0.25em] text-ink-light ${
             onReading
               ? 'pointer-events-auto rounded-sm border border-[#8c6d58]/15 bg-[#fdfbf7]/30 px-4 py-2 shadow-sm backdrop-blur-lg'
               : ''
@@ -86,9 +82,9 @@ export default function Navbar() {
         </ul>
       </div>
 
-      {/* —— 手机导航（菜单居中；唱片仍在右上角） —— */}
+      {/* —— 手机：汉堡靠左；唱片右上角 —— */}
       <div
-        className={`flex items-center justify-center px-4 py-3.5 md:hidden ${
+        className={`flex items-center justify-between gap-3 px-4 py-3.5 pr-14 md:hidden ${
           onReading ? 'pointer-events-auto' : ''
         }`}
       >
