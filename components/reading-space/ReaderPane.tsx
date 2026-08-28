@@ -22,6 +22,7 @@ import {
 } from '@/lib/reading/annotations';
 import SelectionMenu from '@/components/reading-space/SelectionMenu';
 import NoteComposer from '@/components/reading-space/NoteComposer';
+import VocabComposer from '@/components/reading-space/VocabComposer';
 import AnnotationPanel from '@/components/reading-space/AnnotationPanel';
 import ReadingHistory from '@/components/reading-space/ReadingHistory';
 import {
@@ -83,6 +84,10 @@ export default function ReaderPane({
   const [annotations, setAnnotations] = useState<ReadingAnnotation[]>([]);
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
+  const [vocabDraft, setVocabDraft] = useState<{
+    english: string;
+    source?: string;
+  } | null>(null);
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState('');
   const [tocOpen, setTocOpen] = useState(false);
@@ -508,6 +513,17 @@ export default function ReaderPane({
     setPopup(null);
   }
 
+  function handleAddVocabulary() {
+    if (!popup) return;
+    const english = popup.text.trim().replace(/\s+/g, ' ');
+    if (!english) return;
+    setVocabDraft({
+      english,
+      source: book?.title || undefined,
+    });
+    setPopup(null);
+  }
+
   async function syncAnnotationToHighlights(ann: ReadingAnnotation) {
     setImporting(true);
     try {
@@ -868,6 +884,7 @@ export default function ReaderPane({
           onHighlight={handleHighlight}
           onAddNote={handleAddNote}
           onImport={() => void handleImportFromSelection()}
+          onAddVocabulary={handleAddVocabulary}
         />
       )}
 
@@ -883,6 +900,19 @@ export default function ReaderPane({
           }
           onCancel={() => setNoteDraft(null)}
           onSave={handleNoteSave}
+        />
+      )}
+
+      {vocabDraft && (
+        <VocabComposer
+          english={vocabDraft.english}
+          source={vocabDraft.source}
+          onCancel={() => setVocabDraft(null)}
+          onSaved={(message) => {
+            setVocabDraft(null);
+            clearSelectionUi();
+            showToast(message);
+          }}
         />
       )}
     </div>

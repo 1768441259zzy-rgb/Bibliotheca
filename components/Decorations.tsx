@@ -9,14 +9,17 @@ export default function Decorations() {
   const hideEnvelope =
     pathname.startsWith('/cover-art') ||
     pathname.startsWith('/highlights') ||
+    pathname.startsWith('/vocabulary') ||
     pathname.startsWith('/reading-space');
-  const lilyBehindContent = pathname.startsWith('/highlights');
+  const lilyBehindContent =
+    pathname.startsWith('/highlights') || pathname.startsWith('/vocabulary');
   const showBooks = pathname === '/';
   const homeLilyLeft = pathname === '/';
   const hideTopLily = pathname === '/' || pathname.startsWith('/reading-space');
   const showRightLily =
     pathname.startsWith('/cover-art') ||
     pathname.startsWith('/highlights') ||
+    pathname.startsWith('/vocabulary') ||
     pathname === '/about';
   const isAbout = pathname === '/about';
   const showBabysBreath = isAbout;
