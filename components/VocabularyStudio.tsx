@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { VocabEntry } from '@/lib/vocabulary';
@@ -13,6 +13,17 @@ interface VocabularyStudioProps {
 
 type ViewMode = 'list' | 'flash';
 type CoverMode = 'none' | 'chinese' | 'english';
+type SortOrder = 'newest' | 'oldest';
+
+function sortEntries(list: VocabEntry[], order: SortOrder): VocabEntry[] {
+  const next = [...list];
+  next.sort((a, b) => {
+    const ta = new Date(a.createdAt).getTime() || 0;
+    const tb = new Date(b.createdAt).getTime() || 0;
+    return order === 'newest' ? tb - ta : ta - tb;
+  });
+  return next;
+}
 
 export default function VocabularyStudio({
   initialEntries,
@@ -21,6 +32,7 @@ export default function VocabularyStudio({
   const [entries, setEntries] = useState(initialEntries);
   const [view, setView] = useState<ViewMode>('list');
   const [cover, setCover] = useState<CoverMode>('none');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [flashIndex, setFlashIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [open, setOpen] = useState(false);
@@ -33,6 +45,11 @@ export default function VocabularyStudio({
   const [confirmDelete, setConfirmDelete] = useState<VocabEntry | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
+  const sortedEntries = useMemo(
+    () => sortEntries(entries, sortOrder),
+    [entries, sortOrder]
+  );
+
   useEffect(() => {
     setEntries(initialEntries);
   }, [initialEntries]);
@@ -40,7 +57,7 @@ export default function VocabularyStudio({
   useEffect(() => {
     setFlashIndex(0);
     setFlipped(false);
-  }, [entries.length, view]);
+  }, [sortedEntries.length, view, sortOrder]);
 
   useEffect(() => {
     setRevealedIds(new Set());
@@ -151,12 +168,12 @@ export default function VocabularyStudio({
     });
   }
 
-  const current = entries[flashIndex] ?? null;
+  const current = sortedEntries[flashIndex] ?? null;
 
   function goFlash(delta: number) {
-    if (entries.length === 0) return;
+    if (sortedEntries.length === 0) return;
     setFlipped(false);
-    setFlashIndex((i) => (i + delta + entries.length) % entries.length);
+    setFlashIndex((i) => (i + delta + sortedEntries.length) % sortedEntries.length);
   }
 
   return (
@@ -230,9 +247,34 @@ export default function VocabularyStudio({
             ))}
           </div>
         )}
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <span className="text-[10px] tracking-[0.18em] text-ink-muted">
+            排序
+          </span>
+          {(
+            [
+              ['newest', '最新在前'],
+              ['oldest', '最早在前'],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSortOrder(mode)}
+              className={`border px-3 py-1 text-[10px] tracking-wider transition ${
+                sortOrder === mode
+                  ? 'border-[#8c6d58]/50 bg-[#8c6d58]/10 text-ink'
+                  : 'border-ink/15 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      {entries.length === 0 ? (
+      {sortedEntries.length === 0 ? (
         <div className="rounded-sm border border-white/70 bg-white/55 px-6 py-14 text-center shadow-card backdrop-blur-md">
           <p className="font-display text-lg text-ink-light">尚无词汇</p>
           <p className="mt-2 text-xs tracking-wider text-ink-muted">
@@ -247,7 +289,7 @@ export default function VocabularyStudio({
             <span className="w-16 text-right sm:w-20"> </span>
           </div>
           <ul className="divide-y divide-ink/8">
-            {entries.map((entry) => {
+            {sortedEntries.map((entry) => {
               const revealed = revealedIds.has(entry.id);
               const hideEn = cover === 'english' && !revealed;
               const hideZh = cover === 'chinese' && !revealed;
@@ -344,7 +386,7 @@ export default function VocabularyStudio({
               </p>
             )}
             <p className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
-              {flashIndex + 1} / {entries.length}
+              {flashIndex + 1} / {sortedEntries.length}
             </p>
           </button>
 
