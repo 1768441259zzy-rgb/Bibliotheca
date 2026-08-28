@@ -6,21 +6,25 @@ const MISTY_SRC = `/assets/sound/${encodeURIComponent(
   'Ella Fitzgerald,Erroll Garner,Johnny Burke - Misty.mp3'
 )}`;
 
-export default function SiteVinylPlayer() {
+interface SiteVinylPlayerProps {
+  /** 仅 Home 为 true：允许自动播放；离开 Home 会暂停且不自动播 */
+  autoplayEnabled?: boolean;
+}
+
+export default function SiteVinylPlayer({
+  autoplayEnabled = false,
+}: SiteVinylPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const userPausedRef = useRef(false);
   const unlockNeededRef = useRef(false);
+  const autoplayEnabledRef = useRef(autoplayEnabled);
   const removeUnlockRef = useRef<(() => void) | null>(null);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    try {
-      sessionStorage.removeItem('bibliotheca-site-vinyl');
-    } catch {
-      // ignore
-    }
+  autoplayEnabledRef.current = autoplayEnabled;
 
+  useEffect(() => {
     const audio = new Audio(MISTY_SRC);
     audio.loop = true;
     audio.preload = 'auto';
@@ -35,7 +39,21 @@ export default function SiteVinylPlayer() {
     audio.addEventListener('pause', onPause);
     audio.addEventListener('canplay', onReady);
 
-    let cancelled = false;
+    return () => {
+      removeUnlockRef.current?.();
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('canplay', onReady);
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      audioRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
     const removeUnlock = () => {
       document.removeEventListener('pointerdown', onFirstGesture, true);
@@ -46,12 +64,11 @@ export default function SiteVinylPlayer() {
     removeUnlockRef.current = removeUnlock;
 
     function onFirstGesture(e: Event) {
-      if (cancelled) {
+      if (!autoplayEnabledRef.current) {
         removeUnlock();
         return;
       }
       const target = e.target as Element | null;
-      // 点唱片本身交给 toggle，避免 play 后又被 pause
       if (target?.closest?.('.site-vinyl')) return;
       if (userPausedRef.current || !unlockNeededRef.current) {
         removeUnlock();
@@ -69,8 +86,24 @@ export default function SiteVinylPlayer() {
       document.addEventListener('touchstart', onFirstGesture, true);
     };
 
+    // 离开 Home：停止自动播，并暂停（不清手动暂停标记，避免误伤）
+    if (!autoplayEnabled) {
+      unlockNeededRef.current = false;
+      removeUnlock();
+      audio.pause();
+      return () => removeUnlock();
+    }
+
+    // 进入 Home：若用户没手动暂停过，尝试自动播
+    if (userPausedRef.current) {
+      return () => removeUnlock();
+    }
+
+    let cancelled = false;
     const tryAutoplay = async () => {
-      if (cancelled || userPausedRef.current) return;
+      if (cancelled || userPausedRef.current || !autoplayEnabledRef.current) {
+        return;
+      }
       try {
         await audio.play();
         unlockNeededRef.current = false;
@@ -90,15 +123,8 @@ export default function SiteVinylPlayer() {
     return () => {
       cancelled = true;
       removeUnlock();
-      audio.removeEventListener('playing', onPlaying);
-      audio.removeEventListener('pause', onPause);
-      audio.removeEventListener('canplay', onReady);
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      audioRef.current = null;
     };
-  }, []);
+  }, [autoplayEnabled]);
 
   async function toggle() {
     const audio = audioRef.current;

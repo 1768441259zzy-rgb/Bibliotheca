@@ -17,6 +17,7 @@ const navItems = [
 export default function Navbar() {
   const pathname = usePathname();
   const onReading = pathname.startsWith('/reading-space');
+  const onHome = pathname === '/';
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function Navbar() {
             );
           })}
           <li className="flex items-center pl-3.5">
-            <SiteVinylPlayer />
+            <SiteVinylPlayer autoplayEnabled={onHome} />
           </li>
         </ul>
       </div>
@@ -112,7 +113,7 @@ export default function Navbar() {
           </span>
         </button>
 
-        <SiteVinylPlayer />
+        <SiteVinylPlayer autoplayEnabled={onHome} />
       </div>
 
       {menuOpen && (
