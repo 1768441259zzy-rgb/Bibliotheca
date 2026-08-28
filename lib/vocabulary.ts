@@ -54,6 +54,7 @@ export async function insertVocab(entry: {
   chinese?: string;
   source?: string;
   id?: string;
+  createdAt?: string;
 }): Promise<VocabEntry> {
   const english = entry.english.trim();
   if (!english) throw new Error('英文不能为空');
@@ -61,6 +62,10 @@ export async function insertVocab(entry: {
   const chinese = (entry.chinese ?? '').trim();
   const id = entry.id ?? `v${Date.now()}`;
   const now = new Date().toISOString();
+  const createdAt =
+    entry.createdAt && !Number.isNaN(new Date(entry.createdAt).getTime())
+      ? new Date(entry.createdAt).toISOString()
+      : now;
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -70,7 +75,7 @@ export async function insertVocab(entry: {
       english,
       chinese,
       source: entry.source?.trim() || null,
-      created_at: now,
+      created_at: createdAt,
       updated_at: now,
     })
     .select('id, english, chinese, source, created_at, updated_at')
@@ -138,6 +143,7 @@ export async function upsertVocabByEnglish(entry: {
   english: string;
   chinese?: string;
   source?: string;
+  createdAt?: string;
 }): Promise<{ entry: VocabEntry; merged: boolean }> {
   const english = entry.english.trim();
   if (!english) throw new Error('英文不能为空');
@@ -174,6 +180,41 @@ export async function upsertVocabByEnglish(entry: {
     english,
     chinese: entry.chinese,
     source: entry.source,
+    createdAt: entry.createdAt,
   });
   return { entry: created, merged: false };
+}
+
+export interface VocabImportItem {
+  english: string;
+  chinese?: string;
+  source?: string;
+  createdAt?: string;
+}
+
+/** 批量导入：按英文合并；新建时保留导入里的日期 */
+export async function importVocabBatch(
+  items: VocabImportItem[]
+): Promise<{ added: number; merged: number; skipped: number }> {
+  let added = 0;
+  let merged = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const english = String(item.english ?? '').trim();
+    if (!english) {
+      skipped += 1;
+      continue;
+    }
+    const result = await upsertVocabByEnglish({
+      english,
+      chinese: item.chinese,
+      source: item.source,
+      createdAt: item.createdAt,
+    });
+    if (result.merged) merged += 1;
+    else added += 1;
+  }
+
+  return { added, merged, skipped };
 }

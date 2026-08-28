@@ -3,12 +3,16 @@ import { revalidatePath } from 'next/cache';
 import {
   deleteVocab,
   getAllVocab,
+  importVocabBatch,
   insertVocab,
   updateVocab,
   upsertVocabByEnglish,
+  type VocabImportItem,
 } from '@/lib/vocabulary';
 
 export const runtime = 'nodejs';
+
+const MAX_IMPORT = 500;
 
 export async function GET() {
   try {
@@ -27,7 +31,27 @@ export async function POST(request: Request) {
       chinese?: string;
       source?: string;
       mergeByEnglish?: boolean;
+      action?: string;
+      entries?: VocabImportItem[];
     };
+
+    if (body.action === 'import') {
+      const raw = Array.isArray(body.entries) ? body.entries : [];
+      if (raw.length === 0) {
+        return NextResponse.json({ error: '没有可导入的词条' }, { status: 400 });
+      }
+      if (raw.length > MAX_IMPORT) {
+        return NextResponse.json(
+          { error: `单次最多导入 ${MAX_IMPORT} 条` },
+          { status: 400 }
+        );
+      }
+
+      const result = await importVocabBatch(raw);
+      const entries = await getAllVocab();
+      revalidatePath('/vocabulary');
+      return NextResponse.json({ ...result, entries });
+    }
 
     const english = String(body.english ?? '').trim();
     const chinese = String(body.chinese ?? '').trim();

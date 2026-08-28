@@ -1,9 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { VocabEntry } from '@/lib/vocabulary';
+import { formatAnnotationDate } from '@/lib/reading/annotations';
+import {
+  exportVocabCsv,
+  exportVocabExcel,
+  exportVocabJson,
+  exportVocabPdfPrint,
+  exportVocabWord,
+  parseVocabImportFile,
+} from '@/lib/vocab-io';
 import InteractiveTitle from '@/components/InteractiveTitle';
 import ModalPortal from '@/components/ModalPortal';
 
@@ -29,6 +38,7 @@ export default function VocabularyStudio({
   initialEntries,
 }: VocabularyStudioProps) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [entries, setEntries] = useState(initialEntries);
   const [view, setView] = useState<ViewMode>('list');
   const [cover, setCover] = useState<CoverMode>('none');
@@ -41,6 +51,7 @@ export default function VocabularyStudio({
   const [chinese, setChinese] = useState('');
   const [source, setSource] = useState('');
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState<VocabEntry | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
@@ -159,6 +170,96 @@ export default function VocabularyStudio({
     });
   }
 
+  function handleExportExcel() {
+    try {
+      exportVocabExcel(sortedEntries);
+      setStatus(`已导出 Excel · ${sortedEntries.length} 条`);
+    } catch {
+      setError('导出 Excel 失败');
+    }
+  }
+
+  async function handleExportWord() {
+    try {
+      await exportVocabWord(sortedEntries);
+      setStatus(`已导出 Word · ${sortedEntries.length} 条`);
+    } catch {
+      setError('导出 Word 失败');
+    }
+  }
+
+  function handleExportPdf() {
+    try {
+      exportVocabPdfPrint(sortedEntries);
+      setStatus('已打开打印页，可另存为 PDF');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '导出 PDF 失败');
+    }
+  }
+
+  function handleExportJson() {
+    exportVocabJson(sortedEntries);
+    setStatus(`已导出 JSON · ${sortedEntries.length} 条`);
+  }
+
+  function handleExportCsv() {
+    exportVocabCsv(sortedEntries);
+    setStatus(`已导出 CSV · ${sortedEntries.length} 条`);
+  }
+
+  function handleImportClick() {
+    fileRef.current?.click();
+  }
+
+  function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setError('');
+    setStatus('');
+    startTransition(async () => {
+      try {
+        const items = await parseVocabImportFile(file);
+        if (items.length === 0) {
+          setError('文件里没有可识别的词条（请用 Excel / Word 表格）');
+          return;
+        }
+
+        const res = await fetch('/api/vocabulary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'import', entries: items }),
+        });
+        const data = (await res.json()) as {
+          added?: number;
+          merged?: number;
+          skipped?: number;
+          entries?: VocabEntry[];
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(data.error || '导入失败');
+          return;
+        }
+
+        if (data.entries) setEntries(data.entries);
+        setStatus(
+          `导入完成：新增 ${data.added ?? 0} · 合并 ${data.merged ?? 0}${
+            data.skipped ? ` · 跳过 ${data.skipped}` : ''
+          }`
+        );
+        router.refresh();
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : '导入失败：请使用 Excel / Word / CSV / JSON'
+        );
+      }
+    });
+  }
+
   function toggleReveal(id: string) {
     setRevealedIds((prev) => {
       const next = new Set(prev);
@@ -220,6 +321,69 @@ export default function VocabularyStudio({
           </button>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={sortedEntries.length === 0 || pending}
+            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
+          >
+            导出 Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportWord()}
+            disabled={sortedEntries.length === 0 || pending}
+            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
+          >
+            导出 Word
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={sortedEntries.length === 0 || pending}
+            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
+          >
+            导出 PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleImportClick}
+            disabled={pending}
+            className="border border-[#c9a84c]/50 bg-[#c9a84c]/10 px-3 py-1.5 text-[10px] tracking-wider text-ink transition hover:bg-[#c9a84c]/20 disabled:opacity-50"
+          >
+            {pending ? '导入中…' : '导入'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportJson}
+            disabled={sortedEntries.length === 0 || pending}
+            className="border border-ink/10 px-2 py-1.5 text-[9px] tracking-wider text-ink-muted/70 transition hover:text-ink-muted disabled:opacity-50"
+            title="备用格式"
+          >
+            JSON
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={sortedEntries.length === 0 || pending}
+            className="border border-ink/10 px-2 py-1.5 text-[9px] tracking-wider text-ink-muted/70 transition hover:text-ink-muted disabled:opacity-50"
+            title="备用格式"
+          >
+            CSV
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.docx,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json,text/csv,text/plain"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+        </div>
+        <p className="mt-2 text-[10px] tracking-wider text-ink-muted/80">
+          导入支持 Excel / Word 表格 · PDF 请用打印页另存
+        </p>
+
         {view === 'list' && (
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <span className="text-[10px] tracking-[0.18em] text-ink-muted">
@@ -272,20 +436,27 @@ export default function VocabularyStudio({
             </button>
           ))}
         </div>
+
+        {status && (
+          <p className="mt-3 text-[11px] tracking-wider text-ink-muted">
+            {status}
+          </p>
+        )}
       </header>
 
       {sortedEntries.length === 0 ? (
         <div className="rounded-sm border border-white/70 bg-white/55 px-6 py-14 text-center shadow-card backdrop-blur-md">
           <p className="font-display text-lg text-ink-light">尚无词汇</p>
           <p className="mt-2 text-xs tracking-wider text-ink-muted">
-            手动添加，或在 Reading 中选中英文后导入
+            手动添加，导入备份，或在 Reading 中选中英文后收录
           </p>
         </div>
       ) : view === 'list' ? (
         <div className="overflow-hidden rounded-sm border border-white/70 bg-white/55 shadow-card backdrop-blur-md">
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 border-b border-ink/10 px-3 py-2.5 text-[10px] tracking-[0.2em] text-ink-muted sm:px-5 sm:py-3 sm:text-xs">
+          <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 border-b border-ink/10 px-3 py-2.5 text-[10px] tracking-[0.2em] text-ink-muted sm:px-5 sm:py-3 sm:text-xs">
             <span>ENGLISH</span>
             <span>中文</span>
+            <span className="w-[4.5rem] text-right sm:w-24">日期</span>
             <span className="w-16 text-right sm:w-20"> </span>
           </div>
           <ul className="divide-y divide-ink/8">
@@ -296,7 +467,7 @@ export default function VocabularyStudio({
               return (
                 <li
                   key={entry.id}
-                  className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
+                  className="grid grid-cols-[1fr_1fr_auto_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
                 >
                   <button
                     type="button"
@@ -336,6 +507,12 @@ export default function VocabularyStudio({
                       )
                     )}
                   </button>
+                  <time
+                    dateTime={entry.createdAt}
+                    className="w-[4.5rem] pt-0.5 text-right text-[10px] tracking-wider text-ink-muted sm:w-24 sm:text-[11px]"
+                  >
+                    {formatAnnotationDate(entry.createdAt)}
+                  </time>
                   <div className="flex w-16 shrink-0 justify-end gap-1 sm:w-20">
                     <button
                       type="button"
@@ -383,6 +560,11 @@ export default function VocabularyStudio({
             {current?.source && (
               <p className="mt-4 text-[10px] tracking-wider text-ink-muted">
                 · {current.source} ·
+              </p>
+            )}
+            {current?.createdAt && (
+              <p className="mt-2 text-[10px] tracking-wider text-ink-muted/80">
+                {formatAnnotationDate(current.createdAt)}
               </p>
             )}
             <p className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
