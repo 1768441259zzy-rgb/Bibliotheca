@@ -338,7 +338,7 @@ export default function Decorations() {
       {/* 首页 books：手机略收，并压到正文下方 */}
       {showBooks && (
         <div
-          className="pointer-events-none fixed bottom-[calc(7%-2mm)] left-0 right-0 z-[6] w-screen origin-bottom scale-[0.92] sm:bottom-[calc(8%-2mm)] sm:scale-[1.02] md:bottom-[calc(9%-2mm)] md:scale-[1.08]"
+          className="pointer-events-none fixed bottom-[calc(7%-2mm)] left-0 right-0 z-[8] w-screen origin-bottom scale-[0.92] sm:bottom-[calc(8%-2mm)] sm:scale-[1.02] md:bottom-[calc(9%-2mm)] md:scale-[1.08]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
