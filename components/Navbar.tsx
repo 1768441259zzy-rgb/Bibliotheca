@@ -46,8 +46,8 @@ export default function Navbar() {
         <SiteVinylPlayer autoplayEnabled={onHome} />
       </div>
 
-      {/* —— 桌面：整组导航靠右；唱片留在右上角 —— */}
-      <div className="hidden items-center justify-end px-10 py-8 pr-[4.25rem] md:flex">
+      {/* —— 桌面：整组导航靠右；与右上角唱片留出间距 —— */}
+      <div className="hidden items-center justify-end px-10 py-8 pr-28 md:flex lg:pr-32">
         <ul
           className={`flex flex-wrap items-center justify-end gap-x-5 text-sm tracking-[0.25em] text-ink-light ${
             onReading
