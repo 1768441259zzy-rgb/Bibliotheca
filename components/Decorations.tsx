@@ -278,7 +278,7 @@ export default function Decorations() {
       {/* 首页左侧百合：手机明显缩小，并压到正文下方，避免挡住引言 */}
       {homeLilyLeft && (
         <div
-          className="pointer-events-none fixed bottom-[-4%] left-[-18%] z-[5] h-[34vh] w-[46vw] origin-bottom-left -rotate-[14deg] sm:bottom-0 sm:left-[-8%] sm:h-[48vh] sm:w-[38vw] sm:-rotate-[18deg] md:left-0 md:h-[calc(100vh-5.5rem)] md:w-auto md:max-w-[55vw] md:-rotate-[20deg]"
+          className="pointer-events-none fixed bottom-[-4%] left-[-18%] z-[15] h-[34vh] w-[46vw] origin-bottom-left -rotate-[14deg] sm:bottom-0 sm:left-[-8%] sm:h-[48vh] sm:w-[38vw] sm:-rotate-[18deg] md:left-0 md:h-[calc(100vh-5.5rem)] md:w-auto md:max-w-[55vw] md:-rotate-[20deg]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
