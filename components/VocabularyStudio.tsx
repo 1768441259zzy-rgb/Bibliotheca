@@ -15,6 +15,9 @@ import {
 } from '@/lib/vocab-io';
 import InteractiveTitle from '@/components/InteractiveTitle';
 import ModalPortal from '@/components/ModalPortal';
+import FloatingVocabIO, {
+  type VocabExportFormat,
+} from '@/components/FloatingVocabIO';
 
 interface VocabularyStudioProps {
   initialEntries: VocabEntry[];
@@ -33,6 +36,39 @@ function sortEntries(list: VocabEntry[], order: SortOrder): VocabEntry[] {
   });
   return next;
 }
+
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+type ListBlock =
+  | { type: 'day'; key: string; label: string }
+  | { type: 'entry'; entry: VocabEntry };
+
+function buildListBlocks(list: VocabEntry[]): ListBlock[] {
+  const blocks: ListBlock[] = [];
+  let lastDay = '';
+  for (const entry of list) {
+    const key = dayKey(entry.createdAt);
+    if (key !== lastDay) {
+      lastDay = key;
+      blocks.push({
+        type: 'day',
+        key,
+        label:
+          key === 'unknown'
+            ? '日期未知'
+            : formatAnnotationDate(entry.createdAt),
+      });
+    }
+    blocks.push({ type: 'entry', entry });
+  }
+  return blocks;
+}
+
+type ExportFormat = VocabExportFormat;
 
 export default function VocabularyStudio({
   initialEntries,
@@ -59,6 +95,11 @@ export default function VocabularyStudio({
   const sortedEntries = useMemo(
     () => sortEntries(entries, sortOrder),
     [entries, sortOrder]
+  );
+
+  const listBlocks = useMemo(
+    () => buildListBlocks(sortedEntries),
+    [sortedEntries]
   );
 
   useEffect(() => {
@@ -170,41 +211,28 @@ export default function VocabularyStudio({
     });
   }
 
-  function handleExportExcel() {
+  async function handleExport(format: ExportFormat) {
+    setError('');
     try {
-      exportVocabExcel(sortedEntries);
-      setStatus(`已导出 Excel · ${sortedEntries.length} 条`);
-    } catch {
-      setError('导出 Excel 失败');
-    }
-  }
-
-  async function handleExportWord() {
-    try {
-      await exportVocabWord(sortedEntries);
-      setStatus(`已导出 Word · ${sortedEntries.length} 条`);
-    } catch {
-      setError('导出 Word 失败');
-    }
-  }
-
-  function handleExportPdf() {
-    try {
-      exportVocabPdfPrint(sortedEntries);
-      setStatus('已打开打印页，可另存为 PDF');
+      if (format === 'excel') {
+        await exportVocabExcel(sortedEntries);
+        setStatus(`已导出 Excel · ${sortedEntries.length} 条`);
+      } else if (format === 'word') {
+        await exportVocabWord(sortedEntries);
+        setStatus(`已导出 Word · ${sortedEntries.length} 条`);
+      } else if (format === 'pdf') {
+        exportVocabPdfPrint(sortedEntries);
+        setStatus('已打开打印页，可另存为 PDF');
+      } else if (format === 'csv') {
+        exportVocabCsv(sortedEntries);
+        setStatus(`已导出 CSV · ${sortedEntries.length} 条`);
+      } else {
+        exportVocabJson(sortedEntries);
+        setStatus(`已导出 JSON · ${sortedEntries.length} 条`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '导出 PDF 失败');
+      setError(err instanceof Error ? err.message : '导出失败');
     }
-  }
-
-  function handleExportJson() {
-    exportVocabJson(sortedEntries);
-    setStatus(`已导出 JSON · ${sortedEntries.length} 条`);
-  }
-
-  function handleExportCsv() {
-    exportVocabCsv(sortedEntries);
-    setStatus(`已导出 CSV · ${sortedEntries.length} 条`);
   }
 
   function handleImportClick() {
@@ -278,7 +306,7 @@ export default function VocabularyStudio({
   }
 
   return (
-    <section className="relative z-10 mx-auto max-w-3xl pl-3 sm:px-2 md:px-4">
+    <section className="relative z-10 mx-auto max-w-3xl px-3 sm:px-4">
       <header className="mb-8 text-center sm:mb-10">
         <InteractiveTitle
           text="Vocabulary"
@@ -289,11 +317,11 @@ export default function VocabularyStudio({
           WORDS WORTH KEEPING
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:mt-8 sm:gap-3">
+        <div className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-2 sm:mt-8 sm:gap-3">
           <button
             type="button"
             onClick={() => setView('list')}
-            className={`interactive-btn border px-4 py-2 text-[10px] tracking-[0.22em] sm:text-xs ${
+            className={`interactive-btn border px-4 py-2 text-[10px] tracking-[0.2em] sm:text-xs ${
               view === 'list'
                 ? 'border-[#c9a84c]/80 bg-[#c9a84c]/20 text-ink'
                 : 'border-[#c9a84c]/40 bg-[#c9a84c]/05 text-ink-muted hover:bg-[#c9a84c]/12'
@@ -304,7 +332,7 @@ export default function VocabularyStudio({
           <button
             type="button"
             onClick={() => setView('flash')}
-            className={`interactive-btn border px-4 py-2 text-[10px] tracking-[0.22em] sm:text-xs ${
+            className={`interactive-btn border px-4 py-2 text-[10px] tracking-[0.2em] sm:text-xs ${
               view === 'flash'
                 ? 'border-[#c9a84c]/80 bg-[#c9a84c]/20 text-ink'
                 : 'border-[#c9a84c]/40 bg-[#c9a84c]/05 text-ink-muted hover:bg-[#c9a84c]/12'
@@ -315,126 +343,10 @@ export default function VocabularyStudio({
           <button
             type="button"
             onClick={openAdd}
-            className="interactive-btn border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-4 py-2 text-[10px] tracking-[0.22em] text-ink hover:bg-[#c9a84c]/20 sm:text-xs sm:tracking-[0.28em]"
+            className="interactive-btn border border-[#c9a84c]/70 bg-[#c9a84c]/10 px-4 py-2 text-[10px] tracking-[0.2em] text-ink hover:bg-[#c9a84c]/20 sm:text-xs"
           >
             + ADD WORD
           </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            disabled={sortedEntries.length === 0 || pending}
-            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
-          >
-            导出 Excel
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExportWord()}
-            disabled={sortedEntries.length === 0 || pending}
-            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
-          >
-            导出 Word
-          </button>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={sortedEntries.length === 0 || pending}
-            className="border border-ink/15 bg-white/40 px-3 py-1.5 text-[10px] tracking-wider text-ink-muted transition hover:border-[#c9a84c]/50 hover:text-ink disabled:opacity-50"
-          >
-            导出 PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleImportClick}
-            disabled={pending}
-            className="border border-[#c9a84c]/50 bg-[#c9a84c]/10 px-3 py-1.5 text-[10px] tracking-wider text-ink transition hover:bg-[#c9a84c]/20 disabled:opacity-50"
-          >
-            {pending ? '导入中…' : '导入'}
-          </button>
-          <button
-            type="button"
-            onClick={handleExportJson}
-            disabled={sortedEntries.length === 0 || pending}
-            className="border border-ink/10 px-2 py-1.5 text-[9px] tracking-wider text-ink-muted/70 transition hover:text-ink-muted disabled:opacity-50"
-            title="备用格式"
-          >
-            JSON
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={sortedEntries.length === 0 || pending}
-            className="border border-ink/10 px-2 py-1.5 text-[9px] tracking-wider text-ink-muted/70 transition hover:text-ink-muted disabled:opacity-50"
-            title="备用格式"
-          >
-            CSV
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.docx,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json,text/csv,text/plain"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-        </div>
-        <p className="mt-2 text-[10px] tracking-wider text-ink-muted/80">
-          导入支持 Excel / Word 表格 · PDF 请用打印页另存
-        </p>
-
-        {view === 'list' && (
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <span className="text-[10px] tracking-[0.18em] text-ink-muted">
-              遮盖
-            </span>
-            {(
-              [
-                ['none', '不遮'],
-                ['chinese', '遮中文'],
-                ['english', '遮英文'],
-              ] as const
-            ).map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setCover(mode)}
-                className={`border px-3 py-1 text-[10px] tracking-wider transition ${
-                  cover === mode
-                    ? 'border-[#8c6d58]/50 bg-[#8c6d58]/10 text-ink'
-                    : 'border-ink/15 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          <span className="text-[10px] tracking-[0.18em] text-ink-muted">
-            排序
-          </span>
-          {(
-            [
-              ['newest', '最新在前'],
-              ['oldest', '最早在前'],
-            ] as const
-          ).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSortOrder(mode)}
-              className={`border px-3 py-1 text-[10px] tracking-wider transition ${
-                sortOrder === mode
-                  ? 'border-[#8c6d58]/50 bg-[#8c6d58]/10 text-ink'
-                  : 'border-ink/15 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
 
         {status && (
@@ -443,6 +355,21 @@ export default function VocabularyStudio({
           </p>
         )}
       </header>
+
+      <FloatingVocabIO
+        count={sortedEntries.length}
+        pending={pending}
+        canExport={sortedEntries.length > 0}
+        onExport={(format) => void handleExport(format)}
+        onImport={handleImportClick}
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.xls,.docx,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json,text/csv,text/plain"
+        className="hidden"
+        onChange={handleImportFile}
+      />
 
       {sortedEntries.length === 0 ? (
         <div className="rounded-sm border border-white/70 bg-white/55 px-6 py-14 text-center shadow-card backdrop-blur-md">
@@ -453,21 +380,87 @@ export default function VocabularyStudio({
         </div>
       ) : view === 'list' ? (
         <div className="overflow-hidden rounded-sm border border-white/70 bg-white/55 shadow-card backdrop-blur-md">
-          <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 border-b border-ink/10 px-3 py-2.5 text-[10px] tracking-[0.2em] text-ink-muted sm:px-5 sm:py-3 sm:text-xs">
-            <span>ENGLISH</span>
-            <span>中文</span>
-            <span className="w-[4.5rem] text-right sm:w-24">日期</span>
-            <span className="w-16 text-right sm:w-20"> </span>
+          <div className="space-y-2.5 border-b border-ink/10 px-3 py-3 sm:px-5 sm:py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[10px] tracking-[0.18em] text-ink-muted">
+                  遮盖
+                </span>
+                {(
+                  [
+                    ['none', '不遮'],
+                    ['chinese', '遮中文'],
+                    ['english', '遮英文'],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setCover(mode)}
+                    className={`border px-2.5 py-1 text-[10px] tracking-[0.14em] transition ${
+                      cover === mode
+                        ? 'border-[#c9a84c]/70 bg-[#c9a84c]/15 text-ink'
+                        : 'border-ink/10 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[10px] tracking-[0.18em] text-ink-muted">
+                  排序
+                </span>
+                {(
+                  [
+                    ['newest', '最新'],
+                    ['oldest', '最早'],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setSortOrder(mode)}
+                    className={`border px-2.5 py-1 text-[10px] tracking-[0.14em] transition ${
+                      sortOrder === mode
+                        ? 'border-[#c9a84c]/70 bg-[#c9a84c]/15 text-ink'
+                        : 'border-ink/10 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-[10px] tracking-[0.2em] text-ink-muted sm:text-xs">
+              <span>ENGLISH</span>
+              <span>中文</span>
+              <span className="w-16 text-right sm:w-20"> </span>
+            </div>
           </div>
           <ul className="divide-y divide-ink/8">
-            {sortedEntries.map((entry) => {
+            {listBlocks.map((block) => {
+              if (block.type === 'day') {
+                return (
+                  <li
+                    key={`day-${block.key}`}
+                    className="bg-[#f3e6dc]/55 px-3 py-2 sm:px-5"
+                  >
+                    <time className="text-[10px] tracking-[0.22em] text-ink-muted sm:text-[11px]">
+                      {block.label}
+                    </time>
+                  </li>
+                );
+              }
+
+              const entry = block.entry;
               const revealed = revealedIds.has(entry.id);
               const hideEn = cover === 'english' && !revealed;
               const hideZh = cover === 'chinese' && !revealed;
               return (
                 <li
                   key={entry.id}
-                  className="grid grid-cols-[1fr_1fr_auto_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
+                  className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
                 >
                   <button
                     type="button"
@@ -507,12 +500,6 @@ export default function VocabularyStudio({
                       )
                     )}
                   </button>
-                  <time
-                    dateTime={entry.createdAt}
-                    className="w-[4.5rem] pt-0.5 text-right text-[10px] tracking-wider text-ink-muted sm:w-24 sm:text-[11px]"
-                  >
-                    {formatAnnotationDate(entry.createdAt)}
-                  </time>
                   <div className="flex w-16 shrink-0 justify-end gap-1 sm:w-20">
                     <button
                       type="button"
@@ -536,6 +523,30 @@ export default function VocabularyStudio({
         </div>
       ) : (
         <div className="mx-auto max-w-md">
+          <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
+            <span className="mr-1 text-[10px] tracking-[0.18em] text-ink-muted">
+              排序
+            </span>
+            {(
+              [
+                ['newest', '最新'],
+                ['oldest', '最早'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setSortOrder(mode)}
+                className={`border px-2.5 py-1 text-[10px] tracking-[0.14em] transition ${
+                  sortOrder === mode
+                    ? 'border-[#c9a84c]/70 bg-[#c9a84c]/15 text-ink'
+                    : 'border-ink/10 text-ink-muted hover:border-[#c9a84c]/40 hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => setFlipped((v) => !v)}
@@ -560,11 +571,6 @@ export default function VocabularyStudio({
             {current?.source && (
               <p className="mt-4 text-[10px] tracking-wider text-ink-muted">
                 · {current.source} ·
-              </p>
-            )}
-            {current?.createdAt && (
-              <p className="mt-2 text-[10px] tracking-wider text-ink-muted/80">
-                {formatAnnotationDate(current.createdAt)}
               </p>
             )}
             <p className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">

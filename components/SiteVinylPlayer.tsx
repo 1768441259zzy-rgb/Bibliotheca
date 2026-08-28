@@ -23,7 +23,7 @@ function getSharedAudio(): HTMLAudioElement {
 }
 
 interface SiteVinylPlayerProps {
-  /** 仅 Home 为 true：允许自动播放；离开 Home 会暂停且不自动播 */
+  /** Home 为 true：尝试自动播放；离开 Home 不暂停，继续播 */
   autoplayEnabled?: boolean;
 }
 
@@ -98,20 +98,27 @@ export default function SiteVinylPlayer({
       document.addEventListener('touchstart', onFirstGesture, true);
     };
 
+    // 非 Home：不自动播，但也不打断已在播放的音乐
     if (!autoplayEnabled) {
       unlockNeededRef.current = false;
       removeUnlock();
-      audio.pause();
       return () => removeUnlock();
     }
 
+    // 用户手动暂停过：尊重选择，不强制再开
     if (sharedUserPaused) {
+      return () => removeUnlock();
+    }
+
+    // 已经在播：保持即可
+    if (!audio.paused) {
       return () => removeUnlock();
     }
 
     let cancelled = false;
     const tryAutoplay = async () => {
       if (cancelled || sharedUserPaused || !autoplayEnabledRef.current) return;
+      if (!audio.paused) return;
       try {
         await audio.play();
         unlockNeededRef.current = false;

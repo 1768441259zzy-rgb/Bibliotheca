@@ -41,59 +41,18 @@ export default function Navbar() {
           : 'bg-gradient-to-b from-[#e6c8ba]/90 via-[#f0d8cc]/75 to-transparent backdrop-blur-[2px]'
       }`}
     >
-      {/* 全站只挂一个唱片，避免桌面/手机各一份导致暂停失效 */}
-      <div className="pointer-events-auto absolute right-4 top-3.5 z-[71] md:right-8 md:top-8">
-        <SiteVinylPlayer autoplayEnabled={onHome} />
-      </div>
-
-      {/* —— 桌面：整组导航靠右；与唱片留一小段间距 —— */}
-      <div className="hidden items-center justify-end px-10 py-8 pr-[5.5rem] md:flex">
-        <ul
-          className={`flex flex-wrap items-center justify-end gap-x-5 text-sm tracking-[0.25em] text-ink-light ${
-            onReading
-              ? 'pointer-events-auto rounded-sm border border-[#8c6d58]/15 bg-[#fdfbf7]/30 px-4 py-2 shadow-sm backdrop-blur-lg'
-              : ''
-          }`}
-        >
-          {navItems.map((item, index) => {
-            const isActive =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname.startsWith(item.href);
-
-            return (
-              <li key={item.href} className="flex items-center">
-                {index > 0 && (
-                  <span className="mr-5 text-ink-muted/60" aria-hidden="true">
-                    |
-                  </span>
-                )}
-                <TransitionLink
-                  href={item.href}
-                  className={`nav-link relative pb-1 transition-colors duration-700 ease-out hover:text-ink ${
-                    isActive ? 'nav-link-active text-ink' : ''
-                  }`}
-                >
-                  {item.label}
-                </TransitionLink>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      {/* —— 手机：汉堡靠左；唱片右上角 —— */}
       <div
-        className={`flex items-center justify-between gap-3 px-4 py-3.5 pr-14 md:hidden ${
+        className={`flex items-center gap-3 px-4 py-3.5 md:justify-end md:gap-3.5 md:pl-8 md:pr-4 md:py-6 ${
           onReading ? 'pointer-events-auto' : ''
         }`}
       >
+        {/* 手机汉堡 */}
         <button
           type="button"
           aria-label={menuOpen ? '关闭菜单' : '打开菜单'}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex h-9 w-9 items-center justify-center rounded-sm border border-[#8c6d58]/25 bg-[#fdfbf7]/55 text-ink backdrop-blur-sm"
+          className="flex h-9 w-9 items-center justify-center rounded-sm border border-[#8c6d58]/25 bg-[#fdfbf7]/55 text-ink backdrop-blur-sm md:hidden"
         >
           <span className="sr-only">Menu</span>
           <span className="flex w-4 flex-col gap-[5px]" aria-hidden="true">
@@ -114,6 +73,46 @@ export default function Navbar() {
             />
           </span>
         </button>
+
+        {/* 桌面导航 + 唱片同一行垂直居中，整组靠右 */}
+        <div className="ml-auto flex items-center gap-3 md:ml-0 md:gap-3.5">
+          <ul
+            className={`hidden flex-nowrap items-center justify-end gap-x-2.5 text-[15px] tracking-[0.16em] text-ink-light md:flex ${
+              onReading
+                ? 'rounded-sm border border-[#8c6d58]/15 bg-[#fdfbf7]/30 px-3 py-1.5 shadow-sm backdrop-blur-lg'
+                : ''
+            }`}
+          >
+            {navItems.map((item, index) => {
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+
+              return (
+                <li key={item.href} className="flex items-center gap-x-2.5">
+                  {index > 0 && (
+                    <span className="text-ink-muted/50" aria-hidden="true">
+                      |
+                    </span>
+                  )}
+                  <TransitionLink
+                    href={item.href}
+                    className={`nav-link relative pb-0.5 transition-colors duration-700 ease-out hover:text-ink ${
+                      isActive ? 'nav-link-active text-ink' : ''
+                    }`}
+                  >
+                    {item.label}
+                  </TransitionLink>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="pointer-events-auto shrink-0">
+            <SiteVinylPlayer autoplayEnabled={onHome} />
+          </div>
+        </div>
       </div>
 
       {menuOpen && (

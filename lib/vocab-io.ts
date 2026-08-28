@@ -1,5 +1,4 @@
 import JSZip from 'jszip';
-import * as XLSX from 'xlsx';
 import type { VocabEntry } from '@/lib/vocabulary';
 import { formatAnnotationDate } from '@/lib/reading/annotations';
 
@@ -9,6 +8,10 @@ export type VocabImportItem = {
   source?: string;
   createdAt?: string;
 };
+
+async function loadXlsx() {
+  return import('xlsx');
+}
 
 function stampName(): string {
   return formatAnnotationDate(new Date().toISOString()).replace(/\./g, '-');
@@ -169,7 +172,8 @@ function parseCsvOrJsonText(text: string): VocabImportItem[] {
   });
 }
 
-function parseExcelBuffer(buf: ArrayBuffer): VocabImportItem[] {
+async function parseExcelBuffer(buf: ArrayBuffer): Promise<VocabImportItem[]> {
+  const XLSX = await loadXlsx();
   const wb = XLSX.read(buf, { type: 'array' });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   if (!sheet) return [];
@@ -312,7 +316,8 @@ export function exportVocabCsv(entries: VocabEntry[]) {
   );
 }
 
-export function exportVocabExcel(entries: VocabEntry[]) {
+export async function exportVocabExcel(entries: VocabEntry[]) {
+  const XLSX = await loadXlsx();
   const rows = entries.map((e) => ({
     english: e.english,
     chinese: e.chinese ?? '',
