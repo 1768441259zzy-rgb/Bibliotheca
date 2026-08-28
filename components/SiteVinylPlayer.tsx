@@ -6,6 +6,22 @@ const MISTY_SRC = `/assets/sound/${encodeURIComponent(
   'Ella Fitzgerald,Erroll Garner,Johnny Burke - Misty.mp3'
 )}`;
 
+/** 全站共用一个 Audio，避免桌面/手机导航各挂一份导致“暂停了还在响” */
+let sharedAudio: HTMLAudioElement | null = null;
+let sharedUserPaused = false;
+let sharedListeners = 0;
+
+function getSharedAudio(): HTMLAudioElement {
+  if (!sharedAudio) {
+    const audio = new Audio(MISTY_SRC);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0.42;
+    sharedAudio = audio;
+  }
+  return sharedAudio;
+}
+
 interface SiteVinylPlayerProps {
   /** 仅 Home 为 true：允许自动播放；离开 Home 会暂停且不自动播 */
   autoplayEnabled?: boolean;
@@ -14,8 +30,6 @@ interface SiteVinylPlayerProps {
 export default function SiteVinylPlayer({
   autoplayEnabled = false,
 }: SiteVinylPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const userPausedRef = useRef(false);
   const unlockNeededRef = useRef(false);
   const autoplayEnabledRef = useRef(autoplayEnabled);
   const removeUnlockRef = useRef<(() => void) | null>(null);
@@ -25,11 +39,8 @@ export default function SiteVinylPlayer({
   autoplayEnabledRef.current = autoplayEnabled;
 
   useEffect(() => {
-    const audio = new Audio(MISTY_SRC);
-    audio.loop = true;
-    audio.preload = 'auto';
-    audio.volume = 0.42;
-    audioRef.current = audio;
+    const audio = getSharedAudio();
+    sharedListeners += 1;
 
     const onPlaying = () => setPlaying(true);
     const onPause = () => setPlaying(false);
@@ -38,22 +49,23 @@ export default function SiteVinylPlayer({
     audio.addEventListener('playing', onPlaying);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('canplay', onReady);
+    if (audio.readyState >= 3) setReady(true);
+    setPlaying(!audio.paused);
 
     return () => {
       removeUnlockRef.current?.();
       audio.removeEventListener('playing', onPlaying);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('canplay', onReady);
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      audioRef.current = null;
+      sharedListeners = Math.max(0, sharedListeners - 1);
+      if (sharedListeners === 0) {
+        audio.pause();
+      }
     };
   }, []);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = getSharedAudio();
 
     const removeUnlock = () => {
       document.removeEventListener('pointerdown', onFirstGesture, true);
@@ -70,7 +82,7 @@ export default function SiteVinylPlayer({
       }
       const target = e.target as Element | null;
       if (target?.closest?.('.site-vinyl')) return;
-      if (userPausedRef.current || !unlockNeededRef.current) {
+      if (sharedUserPaused || !unlockNeededRef.current) {
         removeUnlock();
         return;
       }
@@ -86,7 +98,6 @@ export default function SiteVinylPlayer({
       document.addEventListener('touchstart', onFirstGesture, true);
     };
 
-    // 离开 Home：停止自动播，并暂停（不清手动暂停标记，避免误伤）
     if (!autoplayEnabled) {
       unlockNeededRef.current = false;
       removeUnlock();
@@ -94,16 +105,13 @@ export default function SiteVinylPlayer({
       return () => removeUnlock();
     }
 
-    // 进入 Home：若用户没手动暂停过，尝试自动播
-    if (userPausedRef.current) {
+    if (sharedUserPaused) {
       return () => removeUnlock();
     }
 
     let cancelled = false;
     const tryAutoplay = async () => {
-      if (cancelled || userPausedRef.current || !autoplayEnabledRef.current) {
-        return;
-      }
+      if (cancelled || sharedUserPaused || !autoplayEnabledRef.current) return;
       try {
         await audio.play();
         unlockNeededRef.current = false;
@@ -127,16 +135,15 @@ export default function SiteVinylPlayer({
   }, [autoplayEnabled]);
 
   async function toggle() {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = getSharedAudio();
     try {
       if (audio.paused) {
-        userPausedRef.current = false;
+        sharedUserPaused = false;
         unlockNeededRef.current = false;
         removeUnlockRef.current?.();
         await audio.play();
       } else {
-        userPausedRef.current = true;
+        sharedUserPaused = true;
         unlockNeededRef.current = false;
         removeUnlockRef.current?.();
         audio.pause();

@@ -41,8 +41,17 @@ export default function Navbar() {
           : 'bg-gradient-to-b from-[#e6c8ba]/90 via-[#f0d8cc]/75 to-transparent backdrop-blur-[2px]'
       }`}
     >
+      {/* 全站只挂一个唱片，避免桌面/手机各一份导致暂停失效 */}
+      <div
+        className={`pointer-events-auto absolute right-4 top-3.5 z-[71] md:right-8 md:top-8 ${
+          onReading ? '' : ''
+        }`}
+      >
+        <SiteVinylPlayer autoplayEnabled={onHome} />
+      </div>
+
       {/* —— 桌面导航 —— */}
-      <div className="hidden items-center justify-end px-10 py-8 pr-8 md:flex">
+      <div className="hidden items-center justify-end px-10 py-8 pr-[4.25rem] md:flex">
         <ul
           className={`flex flex-wrap items-center justify-end gap-x-5 text-sm tracking-[0.25em] text-ink-light ${
             onReading
@@ -74,15 +83,12 @@ export default function Navbar() {
               </li>
             );
           })}
-          <li className="flex items-center pl-3.5">
-            <SiteVinylPlayer autoplayEnabled={onHome} />
-          </li>
         </ul>
       </div>
 
       {/* —— 手机导航 —— */}
       <div
-        className={`flex items-center justify-between gap-3 px-4 py-3.5 md:hidden ${
+        className={`flex items-center justify-between gap-3 px-4 py-3.5 pr-14 md:hidden ${
           onReading ? 'pointer-events-auto' : ''
         }`}
       >
@@ -112,8 +118,6 @@ export default function Navbar() {
             />
           </span>
         </button>
-
-        <SiteVinylPlayer autoplayEnabled={onHome} />
       </div>
 
       {menuOpen && (
