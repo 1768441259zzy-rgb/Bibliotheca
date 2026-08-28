@@ -278,10 +278,10 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 首页左侧百合：手机明显缩小，并压到正文下方，避免挡住引言 */}
+      {/* 首页左侧百合：手机加大可见度（不用 screen 混合，避免被粉底洗掉） */}
       {homeLilyLeft && (
         <div
-          className="pointer-events-none fixed bottom-[-4%] left-[-18%] z-[15] h-[34vh] w-[46vw] origin-bottom-left -rotate-[14deg] sm:bottom-0 sm:left-[-8%] sm:h-[48vh] sm:w-[38vw] sm:-rotate-[18deg] md:left-0 md:h-[calc(100vh-5.5rem)] md:w-auto md:max-w-[55vw] md:-rotate-[20deg]"
+          className="pointer-events-none fixed bottom-[-2%] left-[-10%] z-[15] h-[42vh] w-[58vw] origin-bottom-left -rotate-[12deg] sm:bottom-0 sm:left-[-8%] sm:h-[48vh] sm:w-[38vw] sm:-rotate-[18deg] md:left-0 md:h-[calc(100vh-5.5rem)] md:w-auto md:max-w-[55vw] md:-rotate-[20deg]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -291,7 +291,7 @@ export default function Decorations() {
             width={1536}
             height={1024}
             data-hit="left"
-            className="lily-sway lily-sway-left h-full w-full object-contain object-left-bottom mix-blend-screen md:w-auto md:max-w-none"
+            className="lily-sway lily-sway-left h-full w-full object-contain object-left-bottom opacity-95 mix-blend-normal sm:mix-blend-screen md:w-auto md:max-w-none"
           />
         </div>
       )}
@@ -338,10 +338,10 @@ export default function Decorations() {
         </div>
       )}
 
-      {/* 首页 books：手机略收，并压到正文下方 */}
+      {/* 首页 books：手机压到信封下方，避免浮在信封上；桌面仍在信封之上、百合之下 */}
       {showBooks && (
         <div
-          className="pointer-events-none fixed bottom-[calc(7%-2mm)] left-0 right-0 z-[8] w-screen origin-bottom scale-[0.92] sm:bottom-[calc(8%-2mm)] sm:scale-[1.02] md:bottom-[calc(9%-2mm)] md:scale-[1.08]"
+          className="pointer-events-none fixed bottom-[-1%] left-0 right-0 z-[3] w-screen origin-bottom scale-[0.88] sm:bottom-[calc(8%-2mm)] sm:z-[8] sm:scale-[1.02] md:bottom-[calc(9%-2mm)] md:scale-[1.08]"
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -397,10 +397,10 @@ export default function Decorations() {
       {!hideEnvelope && (
         <div
           className={`pointer-events-none fixed bottom-0 left-0 w-full origin-bottom transition-opacity duration-150 ${
-            isAbout ? 'z-40' : 'z-[4]'
+            isAbout ? 'z-40' : pathname === '/' ? 'z-[5]' : 'z-[4]'
           } ${
             pathname === '/'
-              ? 'h-[30vh] overflow-hidden sm:h-[26vh] md:h-auto md:overflow-visible'
+              ? 'h-[28vh] overflow-hidden sm:h-[26vh] md:h-auto md:overflow-visible'
               : ''
           }`}
           style={{ opacity: isAbout ? envelopeOpacity : 1 }}

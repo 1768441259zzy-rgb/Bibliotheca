@@ -17,6 +17,16 @@ export interface ReadingSessionMeta {
   scrollTop: number;
   updatedAt: string;
   pageCount?: number;
+  /** 云端：原始文件名 */
+  fileName?: string;
+  /** 云端 Storage 路径 */
+  storagePath?: string;
+  /** original=上传的电子书；payload=本机解析结果迁移包 */
+  storageKind?: 'original' | 'payload';
+  fileSize?: number;
+  mimeType?: string;
+  /** 最近一次成功同步到云端的时间 */
+  cloudSyncedAt?: string;
 }
 
 export interface SavedNeteaseItem {

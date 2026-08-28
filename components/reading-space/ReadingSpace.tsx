@@ -11,11 +11,14 @@ import {
   type ReadingPrefs,
   type ReadingSessionMeta,
   listSessions,
-  loadBookPayload,
   patchPrefs,
   readPrefs,
-  removeSession,
 } from '@/lib/reading/readingStore';
+import {
+  bootstrapReadingCloud,
+  deleteReadingSessionEverywhere,
+  ensureBookAvailable,
+} from '@/lib/reading/readingCloudClient';
 
 const SIZE_OPTIONS: { id: BookSize; label: string; title: string }[] = [
   { id: 'standard', label: '标准', title: '标准宽度' },
@@ -65,15 +68,22 @@ export default function ReadingSpace() {
 
     async function boot() {
       const p = readPrefs();
-      const list = listSessions();
       if (cancelled) return;
       setPrefs(p);
+
+      let list = listSessions();
+      try {
+        list = await bootstrapReadingCloud();
+      } catch (err) {
+        console.warn('Reading cloud bootstrap failed:', err);
+      }
+      if (cancelled) return;
       setSessions(list);
 
-      const lastId = p.lastSessionId;
+      const lastId = p.lastSessionId ?? list[0]?.id ?? null;
       if (lastId) {
         try {
-          const restored = await loadBookPayload(lastId);
+          const restored = await ensureBookAvailable(lastId);
           const meta = list.find((s) => s.id === lastId) ?? null;
           if (!cancelled && restored) {
             setBook(restored);
@@ -127,7 +137,7 @@ export default function ReadingSpace() {
     setError('');
     setBooting(true);
     try {
-      const restored = await loadBookPayload(id);
+      const restored = await ensureBookAvailable(id);
       if (!restored) {
         setError('找不到这份阅读记录，可能已被清除');
         setBooting(false);
@@ -141,14 +151,16 @@ export default function ReadingSpace() {
       refreshSessions();
     } catch (err) {
       console.error(err);
-      setError('打开阅读记录失败');
+      setError(
+        err instanceof Error ? err.message : '打开阅读记录失败'
+      );
     } finally {
       setBooting(false);
     }
   }
 
   async function deleteSession(id: string) {
-    const list = await removeSession(id);
+    const list = await deleteReadingSessionEverywhere(id);
     setSessions(list);
     if (sessionId === id) {
       setBook(null);

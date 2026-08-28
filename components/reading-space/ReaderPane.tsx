@@ -30,6 +30,12 @@ import {
   updateSessionProgress,
   type ReadingSessionMeta,
 } from '@/lib/reading/readingStore';
+import {
+  pushReadingProgress,
+  syncOpenedBookToCloud,
+  pushAnnotationToCloud,
+  deleteAnnotationEverywhere,
+} from '@/lib/reading/readingCloudClient';
 
 interface ReaderPaneProps {
   book: ParsedEbook | null;
@@ -139,6 +145,14 @@ export default function ReaderPane({
         chapterIndex,
         fontScale,
         scrollTop,
+      }).then(() => {
+        void pushReadingProgress({
+          id: sessionId,
+          chapterIndex,
+          fontScale,
+          scrollTop,
+          updatedAt: new Date().toISOString(),
+        });
       });
     }, 500);
     return () => window.clearTimeout(timer);
@@ -151,8 +165,15 @@ export default function ReaderPane({
     const onScroll = () => {
       window.clearTimeout(t);
       t = window.setTimeout(() => {
-        void updateSessionProgress(sessionId, {
-          scrollTop: el.scrollTop,
+        const scrollTop = el.scrollTop;
+        void updateSessionProgress(sessionId, { scrollTop }).then(() => {
+          void pushReadingProgress({
+            id: sessionId,
+            chapterIndex,
+            fontScale,
+            scrollTop,
+            updatedAt: new Date().toISOString(),
+          });
         });
       }, 400);
     };
@@ -161,7 +182,7 @@ export default function ReaderPane({
       el.removeEventListener('scroll', onScroll);
       window.clearTimeout(t);
     };
-  }, [sessionId, book?.title]);
+  }, [sessionId, book?.title, chapterIndex, fontScale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -492,6 +513,7 @@ export default function ReaderPane({
 
     const next = upsertAnnotation(ann);
     setAnnotations(annotationsForBook(book.title, next));
+    void pushAnnotationToCloud(ann);
     return ann;
   }
 
@@ -573,6 +595,8 @@ export default function ReaderPane({
     if (noteDraft.mode === 'edit') {
       const next = updateAnnotation(noteDraft.annotation.id, { note });
       setAnnotations(annotationsForBook(noteDraft.annotation.bookTitle, next));
+      const updated = next.find((a) => a.id === noteDraft.annotation.id);
+      if (updated) void pushAnnotationToCloud(updated);
       setNoteDraft(null);
       showToast('便笺已更新');
       return;
@@ -587,6 +611,7 @@ export default function ReaderPane({
   function handleRemove(id: string) {
     const next = removeAnnotation(id);
     setAnnotations(bookTitle ? annotationsForBook(bookTitle, next) : readAnnotations());
+    void deleteAnnotationEverywhere(id);
     if (proseRef.current) {
       syncMarksInContainer(
         proseRef.current,
@@ -617,6 +642,15 @@ export default function ReaderPane({
       skipChapterScrollRef.current = true;
       setChapterIndex(0);
       onBookLoaded(parsed, meta);
+      void syncOpenedBookToCloud(meta, file).then((cloudMeta) => {
+        if (cloudMeta) {
+          setStatus(
+            parsed.format === 'pdf'
+              ? `已载入并云同步 · 共 ${parsed.pageCount ?? parsed.chapters.length} 页`
+              : `已载入并云同步 · 共 ${parsed.chapters.length} 篇`
+          );
+        }
+      });
       setStatus(
         parsed.format === 'pdf'
           ? `已载入并保存 · 共 ${parsed.pageCount ?? parsed.chapters.length} 页`
