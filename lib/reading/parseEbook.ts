@@ -4,6 +4,9 @@ import { parseDocxFile } from '@/lib/reading/parseDocx';
 
 export type EbookFormat = 'txt' | 'epub' | 'pdf' | 'docx';
 
+/** PDF：text=抽文字可划线；image=仅按页渲染图像 */
+export type PdfReadMode = 'text' | 'image';
+
 export interface ParsedChapter {
   title: string;
   html: string;
@@ -19,6 +22,8 @@ export interface ParsedEbook {
   /** PDF 原始字节，供无文字页回退渲染 */
   pdfData?: Uint8Array;
   pageCount?: number;
+  /** PDF 阅读方式；缺省按有无文字层自动判断 */
+  pdfMode?: PdfReadMode;
 }
 
 export function resolveZipPath(base: string, relative: string): string {
@@ -248,7 +253,10 @@ async function parseEpub(buffer: ArrayBuffer, fileName: string): Promise<ParsedE
   return { title: bookTitle, chapters, format: 'epub' };
 }
 
-export async function parseEbookFile(file: File): Promise<ParsedEbook> {
+export async function parseEbookFile(
+  file: File,
+  options?: { pdfMode?: PdfReadMode }
+): Promise<ParsedEbook> {
   const name = file.name;
   const lower = name.toLowerCase();
   const buffer = await file.arrayBuffer();
@@ -262,7 +270,7 @@ export async function parseEbookFile(file: File): Promise<ParsedEbook> {
   }
 
   if (lower.endsWith('.pdf')) {
-    return parsePdfFile(buffer, name);
+    return parsePdfFile(buffer, name, { mode: options?.pdfMode ?? 'text' });
   }
 
   if (lower.endsWith('.docx')) {

@@ -216,6 +216,7 @@ export async function syncLocalPayloadToCloud(
       format: book.format,
       chapters: book.chapters,
       pageCount: book.pageCount,
+      pdfMode: book.pdfMode,
       pdfBytes: book.pdfData ? Array.from(book.pdfData) : undefined,
     };
     const json = JSON.stringify(payload);
@@ -274,6 +275,7 @@ export async function ensureBookAvailable(
       format: EbookFormat;
       chapters: ParsedEbook['chapters'];
       pageCount?: number;
+      pdfMode?: 'text' | 'image';
       pdfBytes?: number[];
     };
     const book: ParsedEbook = {
@@ -281,6 +283,7 @@ export async function ensureBookAvailable(
       format: row.format,
       chapters: row.chapters,
       pageCount: row.pageCount,
+      pdfMode: row.pdfMode,
       pdfData: row.pdfBytes ? Uint8Array.from(row.pdfBytes) : undefined,
     };
     await saveBookPayload(sessionId, book);
@@ -291,7 +294,10 @@ export async function ensureBookAvailable(
   const file = new File([buf], name, {
     type: data.mimeType || 'application/octet-stream',
   });
-  const parsed = await parseEbookFile(file);
+  const localMeta = listSessions().find((s) => s.id === sessionId);
+  const parsed = await parseEbookFile(file, {
+    pdfMode: localMeta?.pdfMode ?? 'text',
+  });
   await saveBookPayload(sessionId, parsed);
   return parsed;
 }

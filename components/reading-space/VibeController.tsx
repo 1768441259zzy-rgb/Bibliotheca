@@ -21,6 +21,8 @@ import {
   upsertNeteaseLibraryItem,
   type MusicPlayMode,
   type PlaylistTrack,
+  type ReadingBgKind,
+  type ReadingPageTheme,
   type SavedLocalMusicMeta,
   type SavedNeteaseItem,
 } from '@/lib/reading/readingStore';
@@ -33,7 +35,18 @@ import {
 
 interface VibeControllerProps {
   scene: ReadingScene;
+  bgKind: ReadingBgKind;
+  solidBgColor: string;
+  customBgName: string | null;
+  pageTheme: ReadingPageTheme;
+  pageSolidColor: string;
   onSceneChange: (scene: ReadingScene) => void;
+  onBgKindChange: (kind: ReadingBgKind) => void;
+  onSolidBgColorChange: (color: string) => void;
+  onCustomBgImport: (file: File) => Promise<void>;
+  onClearCustomBg: () => Promise<void>;
+  onPageThemeChange: (theme: ReadingPageTheme) => void;
+  onPageSolidColorChange: (color: string) => void;
 }
 
 const POS_KEY = 'bibliotheca-vibe-pos';
@@ -64,7 +77,18 @@ export type { ReadingScene };
 
 export default function VibeController({
   scene,
+  bgKind,
+  solidBgColor,
+  customBgName,
+  pageTheme,
+  pageSolidColor,
   onSceneChange,
+  onBgKindChange,
+  onSolidBgColorChange,
+  onCustomBgImport,
+  onClearCustomBg,
+  onPageThemeChange,
+  onPageSolidColorChange,
 }: VibeControllerProps) {
   const engineRef = useRef<AmbientEngine | null>(null);
   const dragRef = useRef<{
@@ -103,7 +127,10 @@ export default function VibeController({
   const [importing, setImporting] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [bgBusy, setBgBusy] = useState(false);
+  const [bgMsg, setBgMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const bgFileRef = useRef<HTMLInputElement | null>(null);
   const localUrlRef = useRef<string | null>(null);
   const playlistRef = useRef<PlaylistTrack[]>([]);
   const playModeRef = useRef<MusicPlayMode>('order');
@@ -815,7 +842,7 @@ export default function VibeController({
             </p>
             <div className="grid grid-cols-1 gap-2">
               {READING_SCENES.map((item) => {
-                const active = scene === item.id;
+                const active = bgKind === 'scene' && scene === item.id;
                 return (
                   <button
                     key={item.id}
@@ -837,6 +864,150 @@ export default function VibeController({
                 );
               })}
             </div>
+
+            <div className="mt-2.5 space-y-2 border border-[#8c6d58]/18 bg-[#f7efe4]/30 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customBgName) onBgKindChange('custom');
+                    else bgFileRef.current?.click();
+                  }}
+                  className={`border px-2.5 py-1 font-serif text-[10px] tracking-widest transition-colors ${
+                    bgKind === 'custom'
+                      ? 'border-[#8b3a2a]/45 bg-[#8b3a2a]/12 text-[#8b3a2a]'
+                      : 'border-[#8c6d58]/30 text-[#6b4f3f]'
+                  }`}
+                >
+                  自由背景
+                </button>
+                <button
+                  type="button"
+                  disabled={bgBusy}
+                  onClick={() => bgFileRef.current?.click()}
+                  className="font-serif text-[9px] tracking-widest text-[#8c6d58] underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  {customBgName ? '更换' : '上传'}
+                </button>
+              </div>
+              {customBgName && (
+                <div className="flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate font-serif text-[10px] text-[#6b4f3f]">
+                    {customBgName}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={bgBusy}
+                    onClick={() => {
+                      void onClearCustomBg().catch((err) =>
+                        setBgMsg(err instanceof Error ? err.message : '清除失败')
+                      );
+                    }}
+                    className="shrink-0 font-serif text-[9px] text-[#a07060]"
+                  >
+                    清除
+                  </button>
+                </div>
+              )}
+              <input
+                ref={bgFileRef}
+                type="file"
+                accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) return;
+                  setBgBusy(true);
+                  setBgMsg('');
+                  void onCustomBgImport(file)
+                    .then(() => setBgMsg('已套用自由背景'))
+                    .catch((err) =>
+                      setBgMsg(err instanceof Error ? err.message : '上传失败')
+                    )
+                    .finally(() => {
+                      setBgBusy(false);
+                      if (bgFileRef.current) bgFileRef.current.value = '';
+                      window.setTimeout(() => setBgMsg(''), 2200);
+                    });
+                }}
+              />
+
+              <div className="flex items-center justify-between gap-2 border-t border-[#8c6d58]/12 pt-2">
+                <button
+                  type="button"
+                  onClick={() => onBgKindChange('solid')}
+                  className={`border px-2.5 py-1 font-serif text-[10px] tracking-widest transition-colors ${
+                    bgKind === 'solid'
+                      ? 'border-[#8b3a2a]/45 bg-[#8b3a2a]/12 text-[#8b3a2a]'
+                      : 'border-[#8c6d58]/30 text-[#6b4f3f]'
+                  }`}
+                >
+                  纯色背景
+                </button>
+                <label className="flex items-center gap-1.5 font-serif text-[9px] tracking-wider text-[#8c6d58]">
+                  色
+                  <input
+                    type="color"
+                    value={solidBgColor}
+                    onChange={(e) => onSolidBgColorChange(e.target.value)}
+                    className="h-6 w-8 cursor-pointer border border-[#8c6d58]/25 bg-transparent p-0"
+                    aria-label="背景纯色"
+                  />
+                </label>
+              </div>
+              {bgMsg && (
+                <p className="font-serif text-[10px] text-[#8c6d58]">{bgMsg}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 font-serif text-[10px] tracking-[0.2em] text-[#8c6d58]">
+              纸感模式
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: 'default', label: '默认', hint: '羊皮玻璃' },
+                  { id: 'eyecare', label: '护眼', hint: '柔绿低刺激' },
+                  { id: 'kraft', label: '牛皮纸', hint: '暖褐纸感' },
+                  { id: 'solid', label: '纯色纸', hint: '自选纸色' },
+                ] as const
+              ).map((item) => {
+                const active = pageTheme === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onPageThemeChange(item.id)}
+                    className={`border px-2.5 py-2 text-left transition-all duration-300 ${
+                      active
+                        ? 'border-[#8b3a2a]/50 bg-[#8b3a2a]/10 text-[#8b3a2a]'
+                        : 'border-[#8c6d58]/25 bg-[#f7efe4]/40 text-[#6b4f3f] hover:border-[#8c6d58]/45'
+                    }`}
+                  >
+                    <span className="block font-display text-[11px] tracking-wide">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block font-serif text-[9px] opacity-70">
+                      {item.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {pageTheme === 'solid' && (
+              <label className="mt-2 flex items-center justify-between gap-2 border border-[#8c6d58]/18 bg-[#f7efe4]/30 px-3 py-2 font-serif text-[10px] tracking-wider text-[#6b4f3f]">
+                纸面颜色
+                <input
+                  type="color"
+                  value={pageSolidColor}
+                  onChange={(e) => onPageSolidColorChange(e.target.value)}
+                  className="h-6 w-8 cursor-pointer border border-[#8c6d58]/25 bg-transparent p-0"
+                  aria-label="纸面纯色"
+                />
+              </label>
+            )}
           </div>
 
           <div>

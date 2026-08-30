@@ -1,4 +1,4 @@
-import type { ParsedEbook } from '@/lib/reading/parseEbook';
+import type { ParsedEbook, PdfReadMode } from '@/lib/reading/parseEbook';
 
 /** pdfjs 文档实例（版本间 API 略有差异，用最小结构约束） */
 type PdfTextItem = {
@@ -29,7 +29,15 @@ type PdfDocument = {
   cleanup?: () => Promise<void> | void;
 };
 
-let workerReady = false;
+type PdfjsLib = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (src: {
+    data: Uint8Array;
+    useSystemFonts?: boolean;
+  }) => { promise: Promise<PdfDocument> };
+};
+
+let pdfjsLib: PdfjsLib | null = null;
 let cached:
   | {
       key: Uint8Array;
@@ -37,15 +45,55 @@ let cached:
     }
   | null = null;
 
-async function ensurePdfjs() {
-  // legacy 构建自带 Map.getOrInsertComputed 等 polyfill；
-  // 现代构建要求 Chrome 145+，多数浏览器会直接报错。
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  if (!workerReady) {
-    pdfjs.GlobalWorkerOptions.workerSrc = '/assets/pdf/pdf.worker.min.mjs';
-    workerReady = true;
+/** Chrome < 145 等环境缺少该 API；与文件大小无关 */
+function installMapGetOrInsertPolyfill() {
+  const patch = (proto: object) => {
+    const p = proto as {
+      getOrInsert?: (key: unknown, value: unknown) => unknown;
+      getOrInsertComputed?: (
+        key: unknown,
+        callbackfn: (key: unknown) => unknown
+      ) => unknown;
+      has: (key: unknown) => boolean;
+      get: (key: unknown) => unknown;
+      set: (key: unknown, value: unknown) => unknown;
+    };
+    if (typeof p.getOrInsert !== 'function') {
+      p.getOrInsert = function getOrInsert(key, value) {
+        if (!this.has(key)) this.set(key, value);
+        return this.get(key);
+      };
+    }
+    if (typeof p.getOrInsertComputed !== 'function') {
+      p.getOrInsertComputed = function getOrInsertComputed(key, callbackfn) {
+        if (!this.has(key)) this.set(key, callbackfn(key));
+        return this.get(key);
+      };
+    }
+  };
+  patch(Map.prototype);
+  patch(WeakMap.prototype);
+}
+
+async function ensurePdfjs(): Promise<PdfjsLib> {
+  if (pdfjsLib) return pdfjsLib;
+  if (typeof window === 'undefined') {
+    throw new Error('PDF 只能在浏览器中打开');
   }
-  return pdfjs;
+
+  installMapGetOrInsertPolyfill();
+
+  // 动态 import 变量路径，避免 Next/webpack 二次打包弄丢 legacy polyfill
+  const importPublic = new Function(
+    'u',
+    'return import(u)'
+  ) as (u: string) => Promise<PdfjsLib>;
+  const mod = await importPublic('/assets/pdf/pdf.min.mjs?v=6.2.108-legacy');
+
+  mod.GlobalWorkerOptions.workerSrc =
+    '/assets/pdf/pdf.worker.boot.mjs?v=6.2.108-legacy';
+  pdfjsLib = mod;
+  return mod;
 }
 
 async function getPdfDoc(pdfData: Uint8Array): Promise<PdfDocument> {
@@ -141,13 +189,16 @@ async function extractPageCopy(
 }
 
 /**
- * 解析 PDF：尽量抽取文字层（可划线）；无文字的扫描页 text/html 为空，阅读器会回退到图像。
- * 大文件按页抽取，避免一次卡死。
+ * 解析 PDF。
+ * - text：抽取文字层（可划线）；无文字页阅读器会回退图像
+ * - image：不抽文字，只按页图像翻阅（大文件 / 扫描件更合适）
  */
 export async function parsePdfFile(
   buffer: ArrayBuffer,
-  fileName: string
+  fileName: string,
+  options?: { mode?: PdfReadMode }
 ): Promise<ParsedEbook> {
+  const mode: PdfReadMode = options?.mode ?? 'text';
   const data = new Uint8Array(buffer.slice(0));
   const doc = await getPdfDoc(data);
   const pageCount = doc.numPages;
@@ -161,9 +212,26 @@ export async function parsePdfFile(
     meta && typeof meta.info === 'object' && meta.info && 'Title' in meta.info
       ? String((meta.info as { Title?: string }).Title || '').trim()
       : '';
+  const title =
+    infoTitle || fileName.replace(/\.[^.]+$/, '') || 'Untitled PDF';
+
+  if (mode === 'image') {
+    const chapters = Array.from({ length: pageCount }, (_, i) => ({
+      title: `第 ${i + 1} 页`,
+      html: '',
+      text: '',
+    }));
+    return {
+      title,
+      chapters,
+      format: 'pdf',
+      pdfData: data,
+      pageCount,
+      pdfMode: 'image',
+    };
+  }
 
   const chapters: ParsedEbook['chapters'] = [];
-  // 控制并发，避免一次性压垮主线程
   const concurrency = 3;
   for (let start = 0; start < pageCount; start += concurrency) {
     const batch = Array.from(
@@ -184,11 +252,12 @@ export async function parsePdfFile(
   }
 
   return {
-    title: infoTitle || fileName.replace(/\.[^.]+$/, '') || 'Untitled PDF',
+    title,
     chapters,
     format: 'pdf',
     pdfData: data,
     pageCount,
+    pdfMode: 'text',
   };
 }
 

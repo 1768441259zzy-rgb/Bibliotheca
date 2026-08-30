@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ParsedEbook } from '@/lib/reading/parseEbook';
 import { READING_SCENES, type ReadingScene } from '@/lib/reading/scenes';
@@ -8,9 +8,14 @@ import ReaderPane from '@/components/reading-space/ReaderPane';
 import VibeController from '@/components/reading-space/VibeController';
 import {
   type BookSize,
+  type ReadingBgKind,
+  type ReadingPageTheme,
   type ReadingPrefs,
   type ReadingSessionMeta,
+  clearCustomBackground,
+  importCustomBackground,
   listSessions,
+  loadCustomBackgroundBlob,
   patchPrefs,
   readPrefs,
 } from '@/lib/reading/readingStore';
@@ -26,6 +31,22 @@ const SIZE_OPTIONS: { id: BookSize; label: string; title: string }[] = [
   { id: 'full', label: '⤢', title: '全屏模式' },
 ];
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  if (h.length !== 6) return `rgba(253, 251, 247, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function shellColor(theme: ReadingPageTheme, solid: string, opacity: number) {
+  if (theme === 'eyecare') return `rgba(226, 239, 217, ${opacity})`;
+  if (theme === 'kraft') return `rgba(232, 210, 170, ${opacity})`;
+  if (theme === 'solid') return hexToRgba(solid, opacity);
+  return `rgba(253, 251, 247, ${opacity})`;
+}
+
 export default function ReadingSpace() {
   const [mounted, setMounted] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs | null>(null);
@@ -37,6 +58,7 @@ export default function ReadingSpace() {
   );
   const [error, setError] = useState('');
   const [booting, setBooting] = useState(true);
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -108,10 +130,65 @@ export default function ReadingSpace() {
   const scene = prefs?.scene ?? 'sunroom';
   const bookSize = prefs?.bookSize ?? 'wide';
   const glassOpacity = prefs?.glassOpacity ?? 0.4;
+  const bgKind: ReadingBgKind = prefs?.bgKind ?? 'scene';
+  const solidBgColor = prefs?.solidBgColor ?? '#2c241c';
+  const customBgId = prefs?.customBgId ?? null;
+  const pageTheme: ReadingPageTheme = prefs?.pageTheme ?? 'default';
+  const pageSolidColor = prefs?.pageSolidColor ?? '#f4efe6';
   const isFull = bookSize === 'full';
 
+  useEffect(() => {
+    if (!mounted || bgKind !== 'custom' || !customBgId) {
+      setCustomBgUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    let revoked = false;
+    let objectUrl: string | null = null;
+    void loadCustomBackgroundBlob().then((blob) => {
+      if (revoked || !blob) return;
+      objectUrl = URL.createObjectURL(blob);
+      setCustomBgUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return objectUrl;
+      });
+    });
+    return () => {
+      revoked = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [mounted, bgKind, customBgId]);
+
   const setScene = useCallback((next: ReadingScene) => {
-    setPrefs(patchPrefs({ scene: next }));
+    setPrefs(patchPrefs({ scene: next, bgKind: 'scene' }));
+  }, []);
+
+  const setBgKind = useCallback((next: ReadingBgKind) => {
+    setPrefs(patchPrefs({ bgKind: next }));
+  }, []);
+
+  const setSolidBgColor = useCallback((next: string) => {
+    setPrefs(patchPrefs({ solidBgColor: next, bgKind: 'solid' }));
+  }, []);
+
+  const setPageTheme = useCallback((next: ReadingPageTheme) => {
+    setPrefs(patchPrefs({ pageTheme: next }));
+  }, []);
+
+  const setPageSolidColor = useCallback((next: string) => {
+    setPrefs(patchPrefs({ pageSolidColor: next, pageTheme: 'solid' }));
+  }, []);
+
+  const onCustomBgImport = useCallback(async (file: File) => {
+    const next = await importCustomBackground(file);
+    setPrefs(next);
+  }, []);
+
+  const onClearCustomBg = useCallback(async () => {
+    const next = await clearCustomBackground();
+    setPrefs(next);
   }, []);
 
   const setBookSize = useCallback((next: BookSize) => {
@@ -128,6 +205,11 @@ export default function ReadingSpace() {
       : bookSize === 'wide'
         ? 'max-w-5xl'
         : 'max-w-none';
+
+  const shellBg = useMemo(
+    () => shellColor(pageTheme, pageSolidColor, glassOpacity),
+    [pageTheme, pageSolidColor, glassOpacity]
+  );
 
   const refreshSessions = useCallback(() => {
     setSessions(listSessions());
@@ -221,6 +303,7 @@ export default function ReadingSpace() {
     <section
       className="reading-space pointer-events-none fixed inset-0 z-[30] h-[100dvh] w-screen overflow-hidden"
       aria-label="沉浸式读书空间"
+      data-page-theme={pageTheme}
     >
       <div
         className="pointer-events-none absolute inset-0 h-full w-full"
@@ -233,11 +316,31 @@ export default function ReadingSpace() {
             src={item.background}
             alt=""
             className={`reading-scene-bg absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-[1200ms] ease-in-out ${
-              scene === item.id ? 'opacity-100' : 'opacity-0'
+              bgKind === 'scene' && scene === item.id
+                ? 'opacity-100'
+                : 'opacity-0'
             }`}
           />
         ))}
-        <div className="reading-space-veil absolute inset-0" />
+        {bgKind === 'custom' && customBgUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={customBgUrl}
+            alt=""
+            className="reading-scene-bg absolute inset-0 h-full w-full object-cover object-center opacity-100"
+          />
+        )}
+        {bgKind === 'solid' && (
+          <div
+            className="reading-scene-bg absolute inset-0 h-full w-full transition-colors duration-700"
+            style={{ backgroundColor: solidBgColor }}
+          />
+        )}
+        <div
+          className={`reading-space-veil absolute inset-0 ${
+            bgKind === 'solid' ? 'opacity-40' : ''
+          }`}
+        />
       </div>
 
       <div
@@ -274,9 +377,8 @@ export default function ReadingSpace() {
 
         <div
           className="reading-book-shell flex min-h-0 flex-1 flex-col overflow-hidden border border-[#8c6d58]/25 shadow-2xl backdrop-blur-md"
-          style={{
-            backgroundColor: `rgba(253, 251, 247, ${glassOpacity})`,
-          }}
+          data-page-theme={pageTheme}
+          style={{ backgroundColor: shellBg }}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 sm:p-3 md:p-3.5">
             <ReaderPane
@@ -305,7 +407,21 @@ export default function ReadingSpace() {
       </div>
 
       <div className="pointer-events-auto">
-        <VibeController scene={scene} onSceneChange={setScene} />
+        <VibeController
+          scene={scene}
+          bgKind={bgKind}
+          solidBgColor={solidBgColor}
+          customBgName={prefs?.customBgName || null}
+          pageTheme={pageTheme}
+          pageSolidColor={pageSolidColor}
+          onSceneChange={setScene}
+          onBgKindChange={setBgKind}
+          onSolidBgColorChange={setSolidBgColor}
+          onCustomBgImport={onCustomBgImport}
+          onClearCustomBg={onClearCustomBg}
+          onPageThemeChange={setPageTheme}
+          onPageSolidColorChange={setPageSolidColor}
+        />
       </div>
     </section>
   );

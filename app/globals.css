@@ -556,6 +556,24 @@
   background: rgba(253, 251, 247, 0.18);
 }
 
+.reading-book-shell[data-page-theme='eyecare'] .reader-page {
+  background: rgba(220, 236, 210, 0.35);
+}
+
+.reading-book-shell[data-page-theme='kraft'] .reader-page {
+  background:
+    linear-gradient(
+      165deg,
+      rgba(250, 236, 210, 0.45) 0%,
+      rgba(214, 184, 140, 0.28) 48%,
+      rgba(196, 160, 112, 0.22) 100%
+    );
+}
+
+.reading-book-shell[data-page-theme='solid'] .reader-page {
+  background: transparent;
+}
+
 .reader-scroll {
   overscroll-behavior: contain;
 }
@@ -569,6 +587,30 @@
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;
+}
+
+.reading-book-shell[data-page-theme='eyecare'] .reader-prose,
+.reading-book-shell[data-page-theme='eyecare'] .epub-body {
+  color: #2f3d28;
+  text-shadow: 0 0 10px rgba(226, 239, 217, 0.45);
+}
+
+.reading-book-shell[data-page-theme='eyecare'] .epub-body h1,
+.reading-book-shell[data-page-theme='eyecare'] .epub-body h2,
+.reading-book-shell[data-page-theme='eyecare'] .epub-body h3 {
+  color: #3d5240;
+}
+
+.reading-book-shell[data-page-theme='kraft'] .reader-prose,
+.reading-book-shell[data-page-theme='kraft'] .epub-body {
+  color: #3a2a1c;
+  text-shadow: 0 0 10px rgba(245, 230, 200, 0.35);
+}
+
+.reading-book-shell[data-page-theme='kraft'] .epub-body h1,
+.reading-book-shell[data-page-theme='kraft'] .epub-body h2,
+.reading-book-shell[data-page-theme='kraft'] .epub-body h3 {
+  color: #5a4030;
 }
 
 .reader-prose p,

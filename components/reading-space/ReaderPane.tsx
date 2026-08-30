@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ParsedEbook } from '@/lib/reading/parseEbook';
+import type { ParsedEbook, PdfReadMode } from '@/lib/reading/parseEbook';
 import {
   findChapterIndexByPath,
   parseEbookFile,
@@ -97,6 +97,7 @@ export default function ReaderPane({
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState('');
   const [tocOpen, setTocOpen] = useState(false);
+  const [pendingPdf, setPendingPdf] = useState<File | null>(null);
 
   const bookTitle = book?.title ?? '';
 
@@ -193,7 +194,8 @@ export default function ReaderPane({
       const needImage =
         book?.format === 'pdf' &&
         !!book.pdfData &&
-        !(page?.text && page.text.trim().length >= 8);
+        (book.pdfMode === 'image' ||
+          !(page?.text && page.text.trim().length >= 8));
 
       if (!needImage) {
         setPdfImage('');
@@ -235,7 +237,9 @@ export default function ReaderPane({
 
   const chapter = book?.chapters[chapterIndex];
   const chapterHasText = Boolean(chapter?.text && chapter.text.trim().length >= 8);
-  const pdfAsImage = book?.format === 'pdf' && !chapterHasText;
+  const pdfAsImage =
+    book?.format === 'pdf' &&
+    (book.pdfMode === 'image' || !chapterHasText);
   const progress = useMemo(() => {
     if (!book?.chapters.length) return 0;
     return Math.round(((chapterIndex + 1) / book.chapters.length) * 100);
@@ -684,17 +688,17 @@ export default function ReaderPane({
     }
   }
 
-  async function onPickFile(file: File | null) {
-    if (!file) return;
+  async function openEbook(file: File, pdfMode?: PdfReadMode) {
     setLoading(true);
     setPdfImage('');
     setLocalError('');
+    setPendingPdf(null);
     setStatus(`正在打开「${file.name}」…`);
     onError('');
     clearSelectionUi();
 
     try {
-      const parsed = await parseEbookFile(file);
+      const parsed = await parseEbookFile(file, { pdfMode });
       const meta = await persistOpenedBook(parsed, {
         chapterIndex: 0,
         fontScale,
@@ -715,7 +719,9 @@ export default function ReaderPane({
       });
       setStatus(
         parsed.format === 'pdf'
-          ? `已载入并保存 · 共 ${parsed.pageCount ?? parsed.chapters.length} 页`
+          ? parsed.pdfMode === 'image'
+            ? `已载入（图像翻页）· 共 ${parsed.pageCount ?? parsed.chapters.length} 页`
+            : `已载入（文字阅读）· 共 ${parsed.pageCount ?? parsed.chapters.length} 页`
           : `已载入并保存 · 共 ${parsed.chapters.length} 篇`
       );
       window.setTimeout(() => setStatus(''), 2200);
@@ -729,6 +735,18 @@ export default function ReaderPane({
       setLoading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  function onPickFile(file: File | null) {
+    if (!file) return;
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      setPendingPdf(file);
+      setLocalError('');
+      setStatus('');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    void openEbook(file);
   }
 
   return (
@@ -791,7 +809,7 @@ export default function ReaderPane({
         </div>
       </div>
 
-      <div className="reader-page relative min-h-0 flex-1 overflow-hidden border border-[#8c6d58]/15 bg-[#fdfbf7]/25">
+      <div className="reader-page relative min-h-0 flex-1 overflow-hidden border border-[#8c6d58]/15">
         <div
           ref={scrollerRef}
           className="reader-scroll absolute inset-0 overflow-y-auto overscroll-contain px-6 py-7 sm:px-10 sm:py-9 md:px-12"
@@ -803,8 +821,50 @@ export default function ReaderPane({
                 翻开一页静好
               </p>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#8c6d58]">
-                支持 TXT、EPUB、PDF、Word（.docx）。文字版 PDF 可划线；扫描版会以图像显示。
+                支持 TXT、EPUB、PDF、Word（.docx）。PDF 可选手动图像翻页，或抽取文字后划线。
               </p>
+              {pendingPdf && (
+                <div className="mt-6 w-full max-w-sm border border-[#8c6d58]/25 bg-[#fdfbf7]/80 px-4 py-4 text-left">
+                  <p className="font-display text-[15px] text-[#5c4033]">
+                    如何阅读这份 PDF？
+                  </p>
+                  <p className="mt-1 truncate font-serif text-[11px] text-[#8c6d58]">
+                    {pendingPdf.name}
+                  </p>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void openEbook(pendingPdf, 'image')}
+                      className="interactive-btn border border-[#8c6d58]/40 bg-[#f7efe4]/90 px-3 py-2 text-left text-[11px] tracking-wider text-[#5c4033]"
+                    >
+                      图像翻页
+                      <span className="mt-0.5 block font-serif text-[10px] font-normal tracking-normal text-[#8c6d58]">
+                        不抽文字，适合扫描件或大文件；不可划线
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void openEbook(pendingPdf, 'text')}
+                      className="interactive-btn border border-[#c9a84c]/50 bg-[#c9a84c]/10 px-3 py-2 text-left text-[11px] tracking-wider text-[#5c4033]"
+                    >
+                      文字阅读
+                      <span className="mt-0.5 block font-serif text-[10px] font-normal tracking-normal text-[#8c6d58]">
+                        抽取文字层，可划线批注；纯扫描页会自动回退图像
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setPendingPdf(null)}
+                      className="mt-1 self-end font-serif text-[10px] tracking-widest text-[#a07060]"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
               {localError && (
                 <p className="mt-4 max-w-sm text-sm text-[#b85c45]">{localError}</p>
               )}
@@ -852,8 +912,53 @@ export default function ReaderPane({
                 </p>
               )}
               <p className="mt-4 text-center text-[11px] text-[#8c6d58]/80">
-                本页无文字层（多为扫描件），无法划线；文字版 PDF 可直接选字高亮
+                本页无文字层（多为扫描件），无法划线；需要划线请重新上传并选「文字阅读」
               </p>
+            </div>
+          )}
+
+          {pendingPdf && book && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#2a1f18]/35 px-4 backdrop-blur-[2px]">
+              <div className="w-full max-w-sm border border-[#8c6d58]/25 bg-[#fdfbf7] px-4 py-4 shadow-lg">
+                <p className="font-display text-[15px] text-[#5c4033]">
+                  如何阅读这份 PDF？
+                </p>
+                <p className="mt-1 truncate font-serif text-[11px] text-[#8c6d58]">
+                  {pendingPdf.name}
+                </p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void openEbook(pendingPdf, 'image')}
+                    className="interactive-btn border border-[#8c6d58]/40 bg-[#f7efe4]/90 px-3 py-2 text-left text-[11px] tracking-wider text-[#5c4033]"
+                  >
+                    图像翻页
+                    <span className="mt-0.5 block font-serif text-[10px] font-normal tracking-normal text-[#8c6d58]">
+                      不抽文字，适合扫描件或大文件；不可划线
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void openEbook(pendingPdf, 'text')}
+                    className="interactive-btn border border-[#c9a84c]/50 bg-[#c9a84c]/10 px-3 py-2 text-left text-[11px] tracking-wider text-[#5c4033]"
+                  >
+                    文字阅读
+                    <span className="mt-0.5 block font-serif text-[10px] font-normal tracking-normal text-[#8c6d58]">
+                      抽取文字层，可划线批注
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setPendingPdf(null)}
+                    className="mt-1 self-end font-serif text-[10px] tracking-widest text-[#a07060]"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

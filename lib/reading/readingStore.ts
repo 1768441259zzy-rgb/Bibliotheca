@@ -8,6 +8,12 @@ import type { AmbientSoundId } from '@/lib/reading/scenes';
 
 export type BookSize = 'standard' | 'wide' | 'full';
 
+/** 全屏背景：预设场景 / 自选图 / 纯色 */
+export type ReadingBgKind = 'scene' | 'custom' | 'solid';
+
+/** 书页纸感 */
+export type ReadingPageTheme = 'default' | 'eyecare' | 'kraft' | 'solid';
+
 export interface ReadingSessionMeta {
   id: string;
   title: string;
@@ -17,6 +23,8 @@ export interface ReadingSessionMeta {
   scrollTop: number;
   updatedAt: string;
   pageCount?: number;
+  /** PDF：text / image */
+  pdfMode?: 'text' | 'image';
   /** 云端：原始文件名 */
   fileName?: string;
   /** 云端 Storage 路径 */
@@ -79,6 +87,17 @@ export interface ReadingPrefs {
   ambientVol: Record<AmbientSoundId, number>;
   /** 阅读区羊皮纸玻璃不透明度 0.15–0.85 */
   glassOpacity: number;
+  /** 全屏背景类型 */
+  bgKind: ReadingBgKind;
+  /** bgKind=solid 时的背景色 */
+  solidBgColor: string;
+  /** 自选背景在 IndexedDB 中的 id；无则为 null */
+  customBgId: string | null;
+  customBgName: string;
+  /** 书页纸感 */
+  pageTheme: ReadingPageTheme;
+  /** pageTheme=solid 时的纸面色 */
+  pageSolidColor: string;
   /** 当前正在播放的网易云链接 */
   neteaseUrl: string;
   /** 外链播放器样式高度：66 紧凑 · 430 带列表 */
@@ -98,13 +117,16 @@ export interface ReadingPrefs {
 const PREFS_KEY = 'bibliotheca-reading-prefs';
 const META_KEY = 'bibliotheca-reading-sessions';
 const DB_NAME = 'bibliotheca-reading-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const BOOK_STORE = 'books';
 const LOCAL_MUSIC_STORE = 'localMusic';
+const CUSTOM_BG_STORE = 'customBackgrounds';
+const CUSTOM_BG_KEY = 'primary';
 
 export const LOCAL_MUSIC_MAX_COUNT = 24;
 /** 单首上限：大体积 wav / flac 常见 40–120MB，IndexedDB 可存 Blob */
 export const LOCAL_MUSIC_MAX_BYTES = 200 * 1024 * 1024;
+export const CUSTOM_BG_MAX_BYTES = 12 * 1024 * 1024;
 
 const DEFAULT_PREFS: ReadingPrefs = {
   scene: 'sunroom',
@@ -117,6 +139,12 @@ const DEFAULT_PREFS: ReadingPrefs = {
     'candle-moon': 0.35,
   },
   glassOpacity: 0.4,
+  bgKind: 'scene',
+  solidBgColor: '#2c241c',
+  customBgId: null,
+  customBgName: '',
+  pageTheme: 'default',
+  pageSolidColor: '#f4efe6',
   neteaseUrl: '',
   neteasePlayerHeight: 66,
   neteaseLibrary: [],
@@ -135,6 +163,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(LOCAL_MUSIC_STORE)) {
         db.createObjectStore(LOCAL_MUSIC_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(CUSTOM_BG_STORE)) {
+        db.createObjectStore(CUSTOM_BG_STORE, { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -171,6 +202,33 @@ export function readPrefs(): ReadingPrefs {
         typeof parsed.glassOpacity === 'number'
           ? Math.min(0.85, Math.max(0.12, parsed.glassOpacity))
           : DEFAULT_PREFS.glassOpacity,
+      bgKind:
+        parsed.bgKind === 'custom' ||
+        parsed.bgKind === 'solid' ||
+        parsed.bgKind === 'scene'
+          ? parsed.bgKind
+          : DEFAULT_PREFS.bgKind,
+      solidBgColor:
+        typeof parsed.solidBgColor === 'string' &&
+        /^#[0-9a-fA-F]{6}$/.test(parsed.solidBgColor)
+          ? parsed.solidBgColor
+          : DEFAULT_PREFS.solidBgColor,
+      customBgId:
+        typeof parsed.customBgId === 'string' ? parsed.customBgId : null,
+      customBgName:
+        typeof parsed.customBgName === 'string' ? parsed.customBgName : '',
+      pageTheme:
+        parsed.pageTheme === 'eyecare' ||
+        parsed.pageTheme === 'kraft' ||
+        parsed.pageTheme === 'solid' ||
+        parsed.pageTheme === 'default'
+          ? parsed.pageTheme
+          : DEFAULT_PREFS.pageTheme,
+      pageSolidColor:
+        typeof parsed.pageSolidColor === 'string' &&
+        /^#[0-9a-fA-F]{6}$/.test(parsed.pageSolidColor)
+          ? parsed.pageSolidColor
+          : DEFAULT_PREFS.pageSolidColor,
       neteaseUrl:
         typeof parsed.neteaseUrl === 'string' ? parsed.neteaseUrl : '',
       neteasePlayerHeight:
@@ -373,6 +431,96 @@ export async function loadLocalMusicBlob(id: string): Promise<Blob | null> {
   return row?.blob ?? null;
 }
 
+interface StoredCustomBg {
+  id: string;
+  blob: Blob;
+  mimeType: string;
+  fileName: string;
+}
+
+/** 导入自由背景图（覆盖上一张） */
+export async function importCustomBackground(
+  file: File
+): Promise<ReadingPrefs> {
+  if (
+    !file.type.startsWith('image/') &&
+    !/\.(png|jpe?g|webp|gif|avif)$/i.test(file.name)
+  ) {
+    throw new Error('请选择图片文件（png / jpg / webp）');
+  }
+  if (file.size > CUSTOM_BG_MAX_BYTES) {
+    throw new Error(
+      `图片过大（${(file.size / (1024 * 1024)).toFixed(1)}MB），上限 12MB`
+    );
+  }
+
+  const db = await openDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CUSTOM_BG_STORE, 'readwrite');
+      tx.objectStore(CUSTOM_BG_STORE).put({
+        id: CUSTOM_BG_KEY,
+        blob: file,
+        mimeType: file.type || 'image/jpeg',
+        fileName: file.name,
+      } satisfies StoredCustomBg);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('存储被中断'));
+    });
+  } catch (err) {
+    const name =
+      err && typeof err === 'object' && 'name' in err
+        ? String((err as { name: string }).name)
+        : '';
+    if (name === 'QuotaExceededError' || /quota/i.test(String(err))) {
+      throw new Error('浏览器存储空间不足，请换小一点的图');
+    }
+    throw new Error('写入背景失败，请稍后重试');
+  } finally {
+    db.close();
+  }
+
+  return patchPrefs({
+    bgKind: 'custom',
+    customBgId: CUSTOM_BG_KEY,
+    customBgName: file.name.replace(/\.[^.]+$/, '') || file.name,
+  });
+}
+
+export async function loadCustomBackgroundBlob(): Promise<Blob | null> {
+  const db = await openDb();
+  const row = await new Promise<StoredCustomBg | undefined>((resolve, reject) => {
+    const tx = db.transaction(CUSTOM_BG_STORE, 'readonly');
+    const req = tx.objectStore(CUSTOM_BG_STORE).get(CUSTOM_BG_KEY);
+    req.onsuccess = () => resolve(req.result as StoredCustomBg | undefined);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return row?.blob ?? null;
+}
+
+export async function clearCustomBackground(): Promise<ReadingPrefs> {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CUSTOM_BG_STORE, 'readwrite');
+      tx.objectStore(CUSTOM_BG_STORE).delete(CUSTOM_BG_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    // ignore
+  }
+  const prefs = readPrefs();
+  return patchPrefs({
+    customBgId: null,
+    customBgName: '',
+    bgKind: prefs.bgKind === 'custom' ? 'scene' : prefs.bgKind,
+  });
+}
+
 export async function removeLocalMusicItem(
   key: string
 ): Promise<SavedLocalMusicMeta[]> {
@@ -456,6 +604,8 @@ interface StoredBook {
     path?: string;
   }[];
   pageCount?: number;
+  /** PDF 阅读方式 */
+  pdfMode?: 'text' | 'image';
   /** PDF 原始字节（可序列化） */
   pdfBytes?: number[];
 }
@@ -471,6 +621,7 @@ export async function saveBookPayload(
     format: book.format,
     chapters: book.chapters,
     pageCount: book.pageCount,
+    pdfMode: book.pdfMode,
     pdfBytes: book.pdfData ? Array.from(book.pdfData) : undefined,
   };
   await new Promise<void>((resolve, reject) => {
@@ -497,6 +648,7 @@ export async function loadBookPayload(id: string): Promise<ParsedEbook | null> {
     format: row.format,
     chapters: row.chapters,
     pageCount: row.pageCount,
+    pdfMode: row.pdfMode,
     pdfData: row.pdfBytes ? Uint8Array.from(row.pdfBytes) : undefined,
   };
 }
@@ -550,6 +702,7 @@ export async function persistOpenedBook(
     scrollTop: state.scrollTop,
     updatedAt: new Date().toISOString(),
     pageCount: book.pageCount ?? book.chapters.length,
+    ...(book.pdfMode ? { pdfMode: book.pdfMode } : {}),
   };
   await saveBookPayload(id, book);
   upsertSessionMeta(meta);
