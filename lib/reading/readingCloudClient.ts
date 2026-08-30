@@ -1,7 +1,7 @@
 'use client';
 
 import { parseEbookFile } from '@/lib/reading/parseEbook';
-import type { ParsedEbook } from '@/lib/reading/parseEbook';
+import type { EbookFormat, ParsedEbook } from '@/lib/reading/parseEbook';
 import {
   readAnnotations,
   writeAnnotations,
@@ -109,7 +109,7 @@ export async function pushReadingProgress(
 async function signedUploadBlob(opts: {
   id: string;
   title: string;
-  format: 'txt' | 'epub' | 'pdf';
+  format: EbookFormat;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -255,7 +255,7 @@ export async function ensureBookAvailable(
     storageKind?: 'original' | 'payload';
     fileName?: string;
     mimeType?: string;
-    format?: 'txt' | 'epub' | 'pdf';
+    format?: EbookFormat;
     title?: string;
     error?: string;
   };
@@ -271,7 +271,7 @@ export async function ensureBookAvailable(
     const text = new TextDecoder().decode(buf);
     const row = JSON.parse(text) as {
       title: string;
-      format: 'txt' | 'epub' | 'pdf';
+      format: EbookFormat;
       chapters: ParsedEbook['chapters'];
       pageCount?: number;
       pdfBytes?: number[];

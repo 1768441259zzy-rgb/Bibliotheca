@@ -1,5 +1,8 @@
 import JSZip from 'jszip';
 import { parsePdfFile } from '@/lib/reading/parsePdf';
+import { parseDocxFile } from '@/lib/reading/parseDocx';
+
+export type EbookFormat = 'txt' | 'epub' | 'pdf' | 'docx';
 
 export interface ParsedChapter {
   title: string;
@@ -12,8 +15,8 @@ export interface ParsedChapter {
 export interface ParsedEbook {
   title: string;
   chapters: ParsedChapter[];
-  format: 'txt' | 'epub' | 'pdf';
-  /** PDF 原始字节，供按页渲染 */
+  format: EbookFormat;
+  /** PDF 原始字节，供无文字页回退渲染 */
   pdfData?: Uint8Array;
   pageCount?: number;
 }
@@ -262,5 +265,13 @@ export async function parseEbookFile(file: File): Promise<ParsedEbook> {
     return parsePdfFile(buffer, name);
   }
 
-  throw new Error('仅支持 TXT / EPUB / PDF 文件');
+  if (lower.endsWith('.docx')) {
+    return parseDocxFile(buffer, name);
+  }
+
+  if (lower.endsWith('.doc')) {
+    throw new Error('暂不支持旧版 .doc，请用 Word 另存为 .docx 后再上传');
+  }
+
+  throw new Error('仅支持 TXT / EPUB / PDF / DOCX 文件');
 }

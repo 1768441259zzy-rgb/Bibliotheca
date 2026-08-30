@@ -1,19 +1,29 @@
 import type { ParsedEbook } from '@/lib/reading/parseEbook';
 
 /** pdfjs 文档实例（版本间 API 略有差异，用最小结构约束） */
+type PdfTextItem = {
+  str?: string;
+  transform?: number[];
+  hasEOL?: boolean;
+  width?: number;
+};
+
+type PdfPage = {
+  getViewport: (params: { scale: number }) => {
+    width: number;
+    height: number;
+  };
+  render: (params: {
+    canvas: HTMLCanvasElement;
+    canvasContext: CanvasRenderingContext2D;
+    viewport: { width: number; height: number };
+  }) => { promise: Promise<void> };
+  getTextContent: () => Promise<{ items: PdfTextItem[] }>;
+};
+
 type PdfDocument = {
   numPages: number;
-  getPage: (pageNumber: number) => Promise<{
-    getViewport: (params: { scale: number }) => {
-      width: number;
-      height: number;
-    };
-    render: (params: {
-      canvas: HTMLCanvasElement;
-      canvasContext: CanvasRenderingContext2D;
-      viewport: { width: number; height: number };
-    }) => { promise: Promise<void> };
-  }>;
+  getPage: (pageNumber: number) => Promise<PdfPage>;
   getMetadata: () => Promise<{ info?: { Title?: string } } | null>;
   destroy?: () => Promise<void> | void;
   cleanup?: () => Promise<void> | void;
@@ -30,7 +40,6 @@ let cached:
 async function ensurePdfjs() {
   const pdfjs = await import('pdfjs-dist');
   if (!workerReady) {
-    // 优先本地 worker；失败时由调用方提示
     pdfjs.GlobalWorkerOptions.workerSrc = '/assets/pdf/pdf.worker.min.mjs';
     workerReady = true;
   }
@@ -51,14 +60,88 @@ async function getPdfDoc(pdfData: Uint8Array): Promise<PdfDocument> {
   const pdfjs = await ensurePdfjs();
   const doc = (await pdfjs.getDocument({
     data: pdfData.slice(0),
-    // 关闭不必要的字体扫描，加快首屏
     useSystemFonts: true,
   }).promise) as unknown as PdfDocument;
   cached = { key: pdfData, doc };
   return doc;
 }
 
-/** 只读取页数与标题，不做逐页抽文本（避免大 PDF 卡住） */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** 将 pdf.js 文本项拼成可选中的 HTML / 纯文本 */
+function textContentToHtml(items: PdfTextItem[]): { html: string; text: string } {
+  type Line = { y: number; parts: string[] };
+  const lines: Line[] = [];
+
+  for (const item of items) {
+    const str = (item.str ?? '').replace(/\s+/g, ' ');
+    if (!str && !item.hasEOL) continue;
+    const y = Math.round(item.transform?.[5] ?? 0);
+    const last = lines[lines.length - 1];
+    if (!last || Math.abs(last.y - y) > 3) {
+      lines.push({ y, parts: str ? [str] : [] });
+    } else if (str) {
+      const prev = last.parts[last.parts.length - 1] ?? '';
+      if (prev && !/\s$/.test(prev) && !/^\s/.test(str)) {
+        last.parts.push(' ');
+      }
+      last.parts.push(str);
+    }
+    if (item.hasEOL) {
+      lines.push({ y: y - 1, parts: [] });
+    }
+  }
+
+  const paragraphs: string[] = [];
+  let buf: string[] = [];
+  const flush = () => {
+    const joined = buf.join('').replace(/[ \t]+\n/g, '\n').trim();
+    if (joined) paragraphs.push(joined);
+    buf = [];
+  };
+
+  for (const line of lines) {
+    const text = line.parts.join('').trim();
+    if (!text) {
+      flush();
+      continue;
+    }
+    buf.push(text, '\n');
+  }
+  flush();
+
+  const text = paragraphs.join('\n\n').trim();
+  const html = paragraphs
+    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+  return { html, text };
+}
+
+async function extractPageCopy(
+  doc: PdfDocument,
+  pageNumber: number
+): Promise<{ html: string; text: string }> {
+  try {
+    const page = await doc.getPage(pageNumber);
+    const content = await page.getTextContent();
+    return textContentToHtml(content.items ?? []);
+  } catch (err) {
+    console.warn(`PDF page ${pageNumber} text extract failed:`, err);
+    return { html: '', text: '' };
+  }
+}
+
+/**
+ * 解析 PDF：尽量抽取文字层（可划线）；无文字的扫描页 text/html 为空，阅读器会回退到图像。
+ * 大文件按页抽取，避免一次卡死。
+ */
 export async function parsePdfFile(
   buffer: ArrayBuffer,
   fileName: string
@@ -77,11 +160,26 @@ export async function parsePdfFile(
       ? String((meta.info as { Title?: string }).Title || '').trim()
       : '';
 
-  const chapters = Array.from({ length: pageCount }, (_, i) => ({
-    title: `第 ${i + 1} 页`,
-    html: '',
-    text: '',
-  }));
+  const chapters: ParsedEbook['chapters'] = [];
+  // 控制并发，避免一次性压垮主线程
+  const concurrency = 3;
+  for (let start = 0; start < pageCount; start += concurrency) {
+    const batch = Array.from(
+      { length: Math.min(concurrency, pageCount - start) },
+      (_, i) => start + i + 1
+    );
+    const parts = await Promise.all(
+      batch.map(async (pageNumber) => {
+        const copy = await extractPageCopy(doc, pageNumber);
+        return {
+          title: `第 ${pageNumber} 页`,
+          html: copy.html,
+          text: copy.text,
+        };
+      })
+    );
+    chapters.push(...parts);
+  }
 
   return {
     title: infoTitle || fileName.replace(/\.[^.]+$/, '') || 'Untitled PDF',

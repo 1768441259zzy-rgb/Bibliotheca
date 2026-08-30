@@ -2,7 +2,7 @@
  * 阅读记录：IndexedDB 存书卷正文，localStorage 存偏好与会话元数据索引
  */
 
-import type { ParsedEbook } from '@/lib/reading/parseEbook';
+import type { EbookFormat, ParsedEbook } from '@/lib/reading/parseEbook';
 import type { ReadingScene } from '@/lib/reading/scenes';
 import type { AmbientSoundId } from '@/lib/reading/scenes';
 
@@ -11,7 +11,7 @@ export type BookSize = 'standard' | 'wide' | 'full';
 export interface ReadingSessionMeta {
   id: string;
   title: string;
-  format: 'txt' | 'epub' | 'pdf';
+  format: EbookFormat;
   chapterIndex: number;
   fontScale: number;
   scrollTop: number;
@@ -448,7 +448,7 @@ export function removeSessionMeta(id: string): ReadingSessionMeta[] {
 interface StoredBook {
   id: string;
   title: string;
-  format: 'txt' | 'epub' | 'pdf';
+  format: EbookFormat;
   chapters: {
     title: string;
     html: string;

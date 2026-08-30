@@ -1,3 +1,4 @@
+import type { EbookFormat } from '@/lib/reading/parseEbook';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import type { ReadingSessionMeta } from '@/lib/reading/readingStore';
 import type { ReadingAnnotation } from '@/lib/reading/annotations';
@@ -11,7 +12,7 @@ export type StorageKind = 'original' | 'payload';
 export interface CloudReadingSession {
   id: string;
   title: string;
-  format: 'txt' | 'epub' | 'pdf';
+  format: EbookFormat;
   fileName?: string;
   storagePath?: string;
   storageKind: StorageKind;
@@ -58,7 +59,7 @@ function rowToSession(row: SessionRow): CloudReadingSession {
   return {
     id: row.id,
     title: row.title,
-    format: row.format as 'txt' | 'epub' | 'pdf',
+    format: row.format as EbookFormat,
     storageKind: (row.storage_kind as StorageKind) || 'original',
     chapterIndex: row.chapter_index ?? 0,
     fontScale: row.font_scale ?? 1,
@@ -112,7 +113,7 @@ export async function listCloudSessions(): Promise<CloudReadingSession[]> {
 export async function upsertCloudSession(input: {
   id: string;
   title: string;
-  format: 'txt' | 'epub' | 'pdf';
+  format: EbookFormat;
   fileName?: string;
   storagePath?: string;
   storageKind?: StorageKind;

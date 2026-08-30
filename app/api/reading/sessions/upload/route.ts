@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { EbookFormat } from '@/lib/reading/parseEbook';
 import {
   READING_CLOUD_MAX_BYTES,
   createSignedUpload,
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       title?: string;
-      format?: 'txt' | 'epub' | 'pdf';
+      format?: EbookFormat;
       fileName?: string;
       fileSize?: number;
       mimeType?: string;

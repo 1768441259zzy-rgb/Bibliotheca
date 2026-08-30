@@ -16,6 +16,7 @@
     "@opennextjs/cloudflare": "^1.20.2",
     "@supabase/supabase-js": "^2.112.0",
     "jszip": "^3.10.1",
+    "mammoth": "^1.12.2",
     "next": "^15.1.0",
     "nodemailer": "^9.0.3",
     "pdfjs-dist": "^6.2.108",

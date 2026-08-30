@@ -189,7 +189,13 @@ export default function ReaderPane({
     const seq = ++renderSeq.current;
 
     async function render() {
-      if (!book || book.format !== 'pdf' || !book.pdfData) {
+      const page = book?.chapters[chapterIndex];
+      const needImage =
+        book?.format === 'pdf' &&
+        !!book.pdfData &&
+        !(page?.text && page.text.trim().length >= 8);
+
+      if (!needImage) {
         setPdfImage('');
         setPdfRendering(false);
         return;
@@ -200,7 +206,7 @@ export default function ReaderPane({
       setStatus(`正在渲染第 ${chapterIndex + 1} 页…`);
 
       try {
-        const url = await renderPdfPage(book.pdfData, chapterIndex + 1);
+        const url = await renderPdfPage(book!.pdfData!, chapterIndex + 1);
         if (!cancelled && seq === renderSeq.current) {
           setPdfImage(url);
           setStatus('');
@@ -228,6 +234,8 @@ export default function ReaderPane({
   }, [book, chapterIndex, onError]);
 
   const chapter = book?.chapters[chapterIndex];
+  const chapterHasText = Boolean(chapter?.text && chapter.text.trim().length >= 8);
+  const pdfAsImage = book?.format === 'pdf' && !chapterHasText;
   const progress = useMemo(() => {
     if (!book?.chapters.length) return 0;
     return Math.round(((chapterIndex + 1) / book.chapters.length) * 100);
@@ -255,7 +263,7 @@ export default function ReaderPane({
   /** 用命令式 DOM 渲染正文，避免 React 重绘把高亮 mark 冲掉 */
   useEffect(() => {
     const root = proseRef.current;
-    if (!root || !book || !chapter || book.format === 'pdf') return;
+    if (!root || !book || !chapter || pdfAsImage) return;
 
     const title = document.createElement('h2');
     title.className =
@@ -268,6 +276,12 @@ export default function ReaderPane({
       // EPUB 正文自带标题，不再额外插入「第 n 章」之类合成标题
       body.innerHTML = chapter.html;
       root.replaceChildren(body);
+    } else if (
+      (book.format === 'docx' || book.format === 'pdf') &&
+      chapter.html.trim()
+    ) {
+      body.innerHTML = chapter.html;
+      root.replaceChildren(title, body);
     } else {
       body.innerHTML = chapter.text
         .split(/\n{2,}/)
@@ -290,7 +304,14 @@ export default function ReaderPane({
     syncMarksInContainer(root, chapterAnnotations);
     // chapterAnnotations 在本 effect 只用于初次挂载本章；后续靠 annotationKey effect 增量同步
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book?.title, book?.format, chapterIndex, chapter?.html, chapter?.text]);
+  }, [
+    book?.title,
+    book?.format,
+    chapterIndex,
+    chapter?.html,
+    chapter?.text,
+    pdfAsImage,
+  ]);
 
   /** EPUB 内部链接：跳章节 / 锚点，避免当成站点路由导致 404 */
   useEffect(() => {
@@ -391,7 +412,7 @@ export default function ReaderPane({
 
   /** 章节切换 / 内容重挂载后增量同步高亮（不拆已有 mark） */
   useEffect(() => {
-    if (!book || book.format === 'pdf') return;
+    if (!book || pdfAsImage) return;
     let cancelled = false;
     let t2 = 0;
     const run = () => {
@@ -425,7 +446,7 @@ export default function ReaderPane({
   }, []);
 
   const onSelectionChange = useCallback(() => {
-    if (!book || book.format === 'pdf') {
+    if (!book || pdfAsImage) {
       setPopup(null);
       return;
     }
@@ -473,10 +494,10 @@ export default function ReaderPane({
       text,
       range: range.cloneRange(),
     });
-  }, [book]);
+  }, [book, pdfAsImage]);
 
   useEffect(() => {
-    if (!book || book.format === 'pdf') return;
+    if (!book || pdfAsImage) return;
 
     const scroller = scrollerRef.current;
     let debounceTimer = 0;
@@ -519,7 +540,7 @@ export default function ReaderPane({
       document.removeEventListener('selectionchange', onSelChange);
       scroller?.removeEventListener('scroll', onScroll);
     };
-  }, [book, onSelectionChange]);
+  }, [book, pdfAsImage, onSelectionChange]);
 
   function createAnnotation(
     quote: string,
@@ -734,7 +755,7 @@ export default function ReaderPane({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {book?.format !== 'pdf' && (
+          {!pdfAsImage && book && (
             <>
               <button
                 type="button"
@@ -763,7 +784,7 @@ export default function ReaderPane({
           <input
             ref={fileRef}
             type="file"
-            accept=".txt,.epub,.pdf,text/plain,application/epub+zip,application/pdf"
+            accept=".txt,.epub,.pdf,.docx,text/plain,application/epub+zip,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
             onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
           />
@@ -782,7 +803,7 @@ export default function ReaderPane({
                 翻开一页静好
               </p>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#8c6d58]">
-                上传 TXT、EPUB 或 PDF。划线、进度与氛围偏好都会自动保存。
+                支持 TXT、EPUB、PDF、Word（.docx）。文字版 PDF 可划线；扫描版会以图像显示。
               </p>
               {localError && (
                 <p className="mt-4 max-w-sm text-sm text-[#b85c45]">{localError}</p>
@@ -812,7 +833,7 @@ export default function ReaderPane({
             </div>
           )}
 
-          {book && chapter && book.format === 'pdf' && (
+          {book && chapter && pdfAsImage && (
             <div className="mx-auto flex max-w-3xl flex-col items-center">
               {pdfRendering && (
                 <p className="py-16 text-sm text-[#8c6d58]">正在渲染这一页…</p>
@@ -831,12 +852,12 @@ export default function ReaderPane({
                 </p>
               )}
               <p className="mt-4 text-center text-[11px] text-[#8c6d58]/80">
-                PDF 以图像显示，划线功能请使用 TXT / EPUB
+                本页无文字层（多为扫描件），无法划线；文字版 PDF 可直接选字高亮
               </p>
             </div>
           )}
 
-          {book && chapter && book.format !== 'pdf' && (
+          {book && chapter && !pdfAsImage && (
             <article
               ref={proseRef}
               className="reader-prose mx-auto max-w-2xl select-text"
@@ -929,7 +950,7 @@ export default function ReaderPane({
       {/* 贴底抽屉：默认收起，把高度还给正文 */}
       {book && (
         <div className="mt-2 shrink-0 overflow-hidden rounded-sm border border-[#8c6d58]/15">
-          {book.format !== 'pdf' && (
+          {!pdfAsImage && (
             <AnnotationPanel
               compact
               annotations={annotations}

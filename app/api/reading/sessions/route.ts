@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { EbookFormat } from '@/lib/reading/parseEbook';
 import {
   cloudSessionToMeta,
   deleteCloudSession,
@@ -61,7 +62,7 @@ export async function PUT(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       title?: string;
-      format?: 'txt' | 'epub' | 'pdf';
+      format?: EbookFormat;
       fileName?: string;
       storagePath?: string;
       storageKind?: 'original' | 'payload';

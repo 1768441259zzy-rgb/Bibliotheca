@@ -6,7 +6,7 @@
 create table if not exists reading_sessions (
   id text primary key,
   title text not null,
-  format text not null check (format in ('txt', 'epub', 'pdf')),
+  format text not null check (format in ('txt', 'epub', 'pdf', 'docx')),
   file_name text,
   storage_path text,
   storage_kind text not null default 'original'
@@ -26,6 +26,11 @@ create index if not exists reading_sessions_updated_at_idx
 
 create index if not exists reading_sessions_title_format_idx
   on reading_sessions (title, format);
+
+-- 若表已存在旧约束，执行下面两行以支持 docx：
+-- alter table reading_sessions drop constraint if exists reading_sessions_format_check;
+-- alter table reading_sessions add constraint reading_sessions_format_check
+--   check (format in ('txt', 'epub', 'pdf', 'docx'));
 
 alter table reading_sessions enable row level security;
 
