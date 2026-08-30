@@ -38,7 +38,9 @@ let cached:
   | null = null;
 
 async function ensurePdfjs() {
-  const pdfjs = await import('pdfjs-dist');
+  // legacy 构建自带 Map.getOrInsertComputed 等 polyfill；
+  // 现代构建要求 Chrome 145+，多数浏览器会直接报错。
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (!workerReady) {
     pdfjs.GlobalWorkerOptions.workerSrc = '/assets/pdf/pdf.worker.min.mjs';
     workerReady = true;
