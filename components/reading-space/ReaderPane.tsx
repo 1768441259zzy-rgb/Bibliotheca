@@ -432,13 +432,14 @@ export default function ReaderPane({
 
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
-      setPopup(null);
+      // 点菜单时可能短暂清空；若已有缓存选区则保留菜单
+      if (!savedRangeRef.current) setPopup(null);
       return;
     }
 
     const text = sel.toString().trim();
     if (text.length < 2) {
-      setPopup(null);
+      if (!savedRangeRef.current) setPopup(null);
       return;
     }
 
@@ -456,7 +457,15 @@ export default function ReaderPane({
     }
 
     savedRangeRef.current = range.cloneRange();
-    const menuTop = Math.max(rect.top - 45, 8);
+
+    // 手机选区手柄在上方，菜单尽量放选区下方，避免挡住手柄
+    const isNarrow = window.innerWidth < 768;
+    const menuH = 48;
+    let menuTop = rect.top - menuH - 8;
+    if (isNarrow || menuTop < 56) {
+      menuTop = Math.min(rect.bottom + 10, window.innerHeight - menuH - 12);
+    }
+    menuTop = Math.max(8, menuTop);
     const menuLeft = rect.left + rect.width / 2;
     setPopup({
       x: Math.min(Math.max(menuLeft, 96), window.innerWidth - 96),
@@ -467,18 +476,50 @@ export default function ReaderPane({
   }, [book]);
 
   useEffect(() => {
+    if (!book || book.format === 'pdf') return;
+
     const scroller = scrollerRef.current;
-    const onMouseUp = () => {
-      window.setTimeout(onSelectionChange, 10);
+    let debounceTimer = 0;
+    let touchTimer = 0;
+
+    const schedule = (delay = 80) => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => onSelectionChange(), delay);
     };
-    const onScroll = () => setPopup(null);
-    document.addEventListener('mouseup', onMouseUp);
+
+    // 桌面：松开鼠标
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') schedule(20);
+    };
+
+    // 手机/平板：松手后再等一下，等系统选区手柄落稳
+    const onTouchEnd = () => {
+      window.clearTimeout(touchTimer);
+      touchTimer = window.setTimeout(() => onSelectionChange(), 280);
+    };
+
+    // 拖动手柄改选区时持续更新（桌面+触控通用）
+    const onSelChange = () => schedule(120);
+
+    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    document.addEventListener('selectionchange', onSelChange);
+
+    const onScroll = () => {
+      // 滚动阅读区时收起菜单（拖选区手柄一般不滚容器）
+      setPopup(null);
+    };
     scroller?.addEventListener('scroll', onScroll, { passive: true });
+
     return () => {
-      document.removeEventListener('mouseup', onMouseUp);
+      window.clearTimeout(debounceTimer);
+      window.clearTimeout(touchTimer);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('selectionchange', onSelChange);
       scroller?.removeEventListener('scroll', onScroll);
     };
-  }, [onSelectionChange]);
+  }, [book, onSelectionChange]);
 
   function createAnnotation(
     quote: string,
@@ -798,8 +839,8 @@ export default function ReaderPane({
           {book && chapter && book.format !== 'pdf' && (
             <article
               ref={proseRef}
-              className="reader-prose mx-auto max-w-2xl"
-              style={{ fontSize: `${fontScale}rem` }}
+              className="reader-prose mx-auto max-w-2xl select-text"
+              style={{ fontSize: `${fontScale}rem`, WebkitUserSelect: 'text' }}
             />
           )}
         </div>

@@ -566,6 +566,9 @@
   line-height: 1.95;
   font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
   text-shadow: 0 0 12px rgba(253, 251, 247, 0.35);
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .reader-prose p,

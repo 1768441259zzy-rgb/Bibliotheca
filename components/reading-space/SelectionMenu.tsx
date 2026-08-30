@@ -25,6 +25,8 @@ export default function SelectionMenu({
       style={{ left: x, top: y }}
       role="menu"
       onMouseDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.preventDefault()}
+      onTouchStart={(e) => e.preventDefault()}
     >
       <button
         type="button"
