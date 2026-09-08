@@ -10,7 +10,7 @@ export default function HomePage() {
         className="text-4xl sm:text-5xl md:text-6xl lg:text-[6.75rem]"
       />
 
-      <p className="mt-6 text-xs tracking-[0.28em] text-ink-muted sm:mt-8 sm:text-sm sm:tracking-[0.35em] md:text-base">
+      <p className="home-est mt-6 text-xs tracking-[0.28em] text-ink-muted sm:mt-8 sm:text-sm sm:tracking-[0.35em] md:text-base">
         · EST. 2026 ·
       </p>
 

@@ -233,11 +233,23 @@ export async function getAllCovers(): Promise<BookCover[]> {
       .filter((c) => !deletedSet.has(c.id))
       .map((c) => applyOverride(c, overrides[c.id]));
 
-    return applyCoverOrder([...builtin, ...users], orderIds);
+    const byId = new Map<string, BookCover>();
+    for (const c of builtin) byId.set(c.id, c);
+    for (const c of users) byId.set(c.id, c); // 云端同 id 覆盖内置种子
+    return applyCoverOrder([...byId.values()], orderIds);
   } catch (error) {
-    // 避免 Vercel 因 Supabase/排序表未就绪而整页 500
-    console.error('getAllCovers fallback to builtins:', error);
-    return [...bookCovers];
+    // 避免 Vercel 因 Supabase/排序表未就绪而整页 500；尽量合并仓库内备份
+    console.error('getAllCovers fallback to builtins + local backup:', error);
+    try {
+      const { readLocalUserCovers } = await import('@/lib/localUserContent');
+      const localUsers = await readLocalUserCovers();
+      const byId = new Map<string, BookCover>();
+      for (const c of bookCovers) byId.set(c.id, c);
+      for (const c of localUsers) byId.set(c.id, c);
+      return [...byId.values()];
+    } catch {
+      return [...bookCovers];
+    }
   }
 }
 

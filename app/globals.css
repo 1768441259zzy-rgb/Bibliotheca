@@ -328,6 +328,54 @@
   transition-delay: calc(var(--i, 0) * 28ms);
 }
 
+/* Home：入场后烫金扫线，再交给 hover 手感 */
+.interactive-title-home .interactive-title-char {
+  opacity: 0;
+  transform: translateY(0.28em);
+  animation: titleCharEnter 0.85s cubic-bezier(0.33, 1, 0.32, 1) forwards;
+  animation-delay: calc(0.12s + var(--i, 0) * 42ms);
+}
+
+.interactive-title-home .interactive-title-shine {
+  animation: titleShineEnter 0.9s cubic-bezier(0.33, 1, 0.32, 1) 0.85s both;
+}
+
+@keyframes titleCharEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes titleShineEnter {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 0.75;
+  }
+}
+
+.home-est {
+  opacity: 0;
+  animation: homeEstEnter 0.8s cubic-bezier(0.33, 1, 0.32, 1) 0.75s both;
+}
+
+@keyframes homeEstEnter {
+  from {
+    opacity: 0;
+    letter-spacing: 0.5em;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    letter-spacing: inherit;
+    transform: translateY(0);
+  }
+}
+
 .interactive-title:hover .interactive-title-char {
   color: #7a5a2e;
   text-shadow: 0 1px 0 rgba(201, 168, 76, 0.35);
@@ -388,14 +436,92 @@
 
 @media (prefers-reduced-motion: reduce) {
   .interactive-title-char,
-  .interactive-title-shine {
+  .interactive-title-shine,
+  .home-est {
     transition: none !important;
     transform: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .interactive-title-home .interactive-title-shine {
+    transform: scaleX(1) !important;
   }
 }
 
 .lily-sway {
   cursor: default;
+}
+
+/* ========== Studio 入场 / 卡片手感 ========== */
+.studio-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: studioReveal 0.7s cubic-bezier(0.33, 1, 0.32, 1) forwards;
+  animation-delay: calc(0.2s + var(--i, 0) * 55ms);
+}
+
+@keyframes studioReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cover-card-lift {
+  transform-style: preserve-3d;
+  transition:
+    transform 0.55s cubic-bezier(0.33, 1, 0.32, 1),
+    box-shadow 0.55s ease;
+}
+
+.cover-card-lift:hover {
+  transform: translateY(-0.45rem) rotateX(3deg);
+  box-shadow: 0 18px 36px rgba(61, 47, 42, 0.16);
+}
+
+.highlight-card {
+  opacity: 0;
+  transform: translateY(18px);
+  border-left: 2px solid transparent;
+}
+
+.highlight-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.7s cubic-bezier(0.33, 1, 0.32, 1),
+    transform 0.7s cubic-bezier(0.33, 1, 0.32, 1),
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
+  transition-delay: calc(var(--i, 0) * 40ms);
+}
+
+.highlight-card.is-visible:hover {
+  border-left-color: rgba(201, 168, 76, 0.55);
+}
+
+/* ========== 单词卡翻转 ========== */
+.flash-card-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.33, 1, 0.32, 1);
+}
+
+.flash-card.is-flipped .flash-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flash-card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flash-card-back {
+  transform: rotateY(180deg);
+}
+
+.flash-card:hover .flash-card-front {
+  border-color: rgba(201, 168, 76, 0.4);
 }
 
 .lily-sway-top {
@@ -693,11 +819,34 @@ mark.reading-mark {
   .interactive-btn,
   .nav-link::after,
   .modal-backdrop,
-  .modal-panel {
+  .modal-panel,
+  .studio-reveal,
+  .cover-card-lift,
+  .highlight-card,
+  .flash-card-inner,
+  .home-est {
     animation: none !important;
     transition: none !important;
     transform: none !important;
     filter: none !important;
+    opacity: 1 !important;
+  }
+
+  .flash-card.is-flipped .flash-card-inner {
+    transform: none !important;
+  }
+
+  .flash-card-back {
+    display: none;
+  }
+
+  .flash-card.is-flipped .flash-card-front {
+    display: none;
+  }
+
+  .flash-card.is-flipped .flash-card-back {
+    display: flex;
+    transform: none !important;
   }
 
   .page-transition {

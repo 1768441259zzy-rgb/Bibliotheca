@@ -4,6 +4,7 @@ import type { BookCover } from '@/data/content';
 
 interface CoverCardProps {
   cover: BookCover;
+  index?: number;
   onEdit?: (cover: BookCover) => void;
   onDelete?: (cover: BookCover) => void;
   onMoveLeft?: () => void;
@@ -22,6 +23,7 @@ interface CoverCardProps {
 
 export default function CoverCard({
   cover,
+  index = 0,
   onEdit,
   onDelete,
   onMoveLeft,
@@ -48,7 +50,8 @@ export default function CoverCard({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`group relative break-inside-avoid overflow-hidden rounded-sm bg-white/30 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-card-hover ${
+      style={{ ['--i' as string]: index }}
+      className={`studio-reveal cover-card-lift group relative break-inside-avoid overflow-hidden rounded-sm bg-white/30 shadow-card ${
         draggable ? 'cursor-grab active:cursor-grabbing' : ''
       } ${isDragging ? 'opacity-45 scale-[0.98]' : ''} ${
         isDragOver ? 'ring-2 ring-[#c9a84c]/70 ring-offset-2 ring-offset-[#fcf7f4]' : ''

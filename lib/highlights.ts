@@ -189,10 +189,35 @@ export async function getAllHighlights(): Promise<HighlightGroup[]> {
       .filter((g) => !deletedSet.has(g.id))
       .map((g) => applyOverride(g, overrides[g.id]));
 
-    return [...builtin, ...users];
+    const byId = new Map<string, HighlightGroup>();
+    for (const g of builtin) byId.set(g.id, g);
+    for (const g of users) byId.set(g.id, g);
+    return [...byId.values()];
   } catch (error) {
-    console.error('getAllHighlights fallback to builtins:', error);
-    return [...highlightGroups];
+    console.error(
+      'getAllHighlights fallback to builtins + local backup:',
+      error
+    );
+    try {
+      const {
+        readLocalUserHighlights,
+        readLocalHighlightOverrides,
+      } = await import('@/lib/localUserContent');
+      const [localUsers, localOverrides] = await Promise.all([
+        readLocalUserHighlights(),
+        readLocalHighlightOverrides(),
+      ]);
+      const byId = new Map<string, HighlightGroup>();
+      for (const g of highlightGroups) {
+        byId.set(g.id, applyOverride(g, localOverrides[g.id]));
+      }
+      for (const g of localUsers) {
+        byId.set(g.id, applyOverride(g, localOverrides[g.id]));
+      }
+      return [...byId.values()];
+    } catch {
+      return [...highlightGroups];
+    }
   }
 }
 

@@ -263,10 +263,11 @@ export default function HighlightsStudio({
       </header>
 
       <div className="space-y-6 sm:space-y-10">
-        {groups.map((group) => (
+        {groups.map((group, index) => (
           <HighlightCard
             key={group.id}
             group={group}
+            index={index}
             onEditGroup={openEditGroup}
             onDeleteGroup={(g) => setConfirm({ type: 'group', group: g })}
             onEditQuote={openEditQuote}

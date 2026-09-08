@@ -115,34 +115,40 @@ export default function Navbar() {
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="pointer-events-auto border-t border-[#8c6d58]/15 bg-[#fdfbf7]/95 px-4 py-3 shadow-card backdrop-blur-md md:hidden">
-          <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === '/'
-                  ? pathname === '/'
-                  : pathname.startsWith(item.href);
+      <div
+        className={`pointer-events-auto overflow-hidden border-t border-[#8c6d58]/15 bg-[#fdfbf7]/95 shadow-card backdrop-blur-md transition-[max-height,opacity] duration-500 ease-[cubic-bezier(0.33,1,0.32,1)] md:hidden ${
+          menuOpen
+            ? 'max-h-80 opacity-100'
+            : 'pointer-events-none max-h-0 opacity-0'
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        <ul className="flex flex-col gap-1 px-4 py-3">
+          {navItems.map((item) => {
+            const isActive =
+              item.href === '/'
+                ? pathname === '/'
+                : pathname.startsWith(item.href);
 
-              return (
-                <li key={item.href}>
-                  <TransitionLink
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={`block px-2 py-2.5 text-xs tracking-[0.22em] transition-colors ${
-                      isActive
-                        ? 'text-ink'
-                        : 'text-ink-light hover:text-ink'
-                    }`}
-                  >
-                    {item.label}
-                  </TransitionLink>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+            return (
+              <li key={item.href}>
+                <TransitionLink
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  tabIndex={menuOpen ? 0 : -1}
+                  className={`block px-2 py-2.5 text-xs tracking-[0.22em] transition-colors ${
+                    isActive
+                      ? 'text-ink'
+                      : 'text-ink-light hover:text-ink'
+                  }`}
+                >
+                  {item.label}
+                </TransitionLink>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </nav>
   );
 }

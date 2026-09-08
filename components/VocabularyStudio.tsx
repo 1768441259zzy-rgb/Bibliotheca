@@ -550,32 +550,45 @@ export default function VocabularyStudio({
           <button
             type="button"
             onClick={() => setFlipped((v) => !v)}
-            className="group relative flex min-h-[14rem] w-full flex-col items-center justify-center rounded-sm border border-white/70 bg-white/60 px-6 py-10 text-center shadow-card backdrop-blur-md transition hover:border-[#c9a84c]/40 sm:min-h-[16rem]"
+            className={`flash-card group relative w-full text-left [perspective:1200px] ${
+              flipped ? 'is-flipped' : ''
+            }`}
+            aria-pressed={flipped}
           >
-            <p className="text-[10px] tracking-[0.28em] text-ink-muted">
-              {flipped ? '中文 · 再点翻回' : '英文 · 点击翻转'}
-            </p>
-            <p
-              className={`mt-5 font-display leading-snug text-ink ${
-                flipped
-                  ? 'text-2xl sm:text-3xl'
-                  : 'text-xl sm:text-2xl md:text-3xl'
-              }`}
-            >
-              {current
-                ? flipped
-                  ? current.chinese || '（未填中文）'
-                  : current.english
-                : '—'}
-            </p>
-            {current?.source && (
-              <p className="mt-4 text-[10px] tracking-wider text-ink-muted">
-                · {current.source} ·
-              </p>
-            )}
-            <p className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
-              {flashIndex + 1} / {sortedEntries.length}
-            </p>
+            <span className="flash-card-inner relative block min-h-[14rem] w-full sm:min-h-[16rem]">
+              <span className="flash-card-face flash-card-front absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-white/70 bg-white/60 px-6 py-10 text-center shadow-card backdrop-blur-md">
+                <span className="text-[10px] tracking-[0.28em] text-ink-muted">
+                  英文 · 点击翻转
+                </span>
+                <span className="mt-5 font-display text-xl leading-snug text-ink sm:text-2xl md:text-3xl">
+                  {current?.english || '—'}
+                </span>
+                {current?.source && (
+                  <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
+                    · {current.source} ·
+                  </span>
+                )}
+                <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
+                  {flashIndex + 1} / {sortedEntries.length}
+                </span>
+              </span>
+              <span className="flash-card-face flash-card-back absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-[#c9a84c]/35 bg-[#f7efe4]/90 px-6 py-10 text-center shadow-card backdrop-blur-md">
+                <span className="text-[10px] tracking-[0.28em] text-ink-muted">
+                  中文 · 再点翻回
+                </span>
+                <span className="mt-5 font-display text-2xl leading-snug text-ink sm:text-3xl">
+                  {current?.chinese || '（未填中文）'}
+                </span>
+                {current?.source && (
+                  <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
+                    · {current.source} ·
+                  </span>
+                )}
+                <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
+                  {flashIndex + 1} / {sortedEntries.length}
+                </span>
+              </span>
+            </span>
           </button>
 
           <div className="mt-5 flex items-center justify-center gap-3">

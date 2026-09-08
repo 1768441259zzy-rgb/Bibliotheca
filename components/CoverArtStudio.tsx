@@ -266,11 +266,12 @@ export default function CoverArtStudio({ initialCovers }: CoverArtStudioProps) {
 
       <div className="relative px-2 py-4 sm:px-6 sm:py-8 md:px-8 md:py-10">
         <GoldFiligreeFrame />
-        <div className="relative z-10 mx-auto grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
+        <div className="relative z-10 mx-auto grid max-w-4xl grid-cols-2 gap-3 [perspective:900px] sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
           {covers.map((cover, index) => (
             <CoverCard
               key={cover.id}
               cover={cover}
+              index={index}
               onEdit={openEdit}
               onDelete={setConfirmDelete}
               canMoveLeft={index > 0}
