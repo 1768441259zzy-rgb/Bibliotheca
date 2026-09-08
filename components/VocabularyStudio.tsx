@@ -81,6 +81,10 @@ export default function VocabularyStudio({
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [flashIndex, setFlashIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [deckMotion, setDeckMotion] = useState<
+    'idle' | 'exit-left' | 'exit-right' | 'enter-left' | 'enter-right'
+  >('idle');
+  const flashBusyRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [english, setEnglish] = useState('');
@@ -299,11 +303,57 @@ export default function VocabularyStudio({
 
   const current = sortedEntries[flashIndex] ?? null;
 
-  function goFlash(delta: number) {
-    if (sortedEntries.length === 0) return;
-    setFlipped(false);
-    setFlashIndex((i) => (i + delta + sortedEntries.length) % sortedEntries.length);
+  function wait(ms: number) {
+    return new Promise<void>((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
   }
+
+  async function goFlash(delta: number) {
+    if (sortedEntries.length === 0 || flashBusyRef.current) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setFlipped(false);
+      setFlashIndex(
+        (i) => (i + delta + sortedEntries.length) % sortedEntries.length
+      );
+      return;
+    }
+
+    flashBusyRef.current = true;
+    const goingNext = delta > 0;
+    setDeckMotion(goingNext ? 'exit-left' : 'exit-right');
+    await wait(280);
+    setFlipped(false);
+    setFlashIndex(
+      (i) => (i + delta + sortedEntries.length) % sortedEntries.length
+    );
+    setDeckMotion(goingNext ? 'enter-right' : 'enter-left');
+    await wait(420);
+    setDeckMotion('idle');
+    flashBusyRef.current = false;
+  }
+
+  useEffect(() => {
+    if (view !== 'flash') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        void goFlash(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        void goFlash(-1);
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+        e.preventDefault();
+        setFlipped((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // goFlash closes over latest sortedEntries / busy flag via refs+state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, sortedEntries.length]);
 
   return (
     <section className="relative z-10 mx-auto max-w-3xl px-3 sm:px-4">
@@ -379,7 +429,7 @@ export default function VocabularyStudio({
           </p>
         </div>
       ) : view === 'list' ? (
-        <div className="overflow-hidden rounded-sm border border-white/70 bg-white/55 shadow-card backdrop-blur-md">
+        <div className="vocab-view-pane overflow-hidden rounded-sm border border-white/70 bg-white/55 shadow-card backdrop-blur-md">
           <div className="space-y-2.5 border-b border-ink/10 px-3 py-3 sm:px-5 sm:py-3.5">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -460,7 +510,7 @@ export default function VocabularyStudio({
               return (
                 <li
                   key={entry.id}
-                  className="grid grid-cols-[1fr_1fr_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
+                  className="vocab-row grid grid-cols-[1fr_1fr_auto] items-start gap-2 px-3 py-3 sm:gap-3 sm:px-5 sm:py-3.5"
                 >
                   <button
                     type="button"
@@ -522,7 +572,7 @@ export default function VocabularyStudio({
           </ul>
         </div>
       ) : (
-        <div className="mx-auto max-w-md">
+        <div className="vocab-view-pane mx-auto max-w-md">
           <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
             <span className="mr-1 text-[10px] tracking-[0.18em] text-ink-muted">
               排序
@@ -547,61 +597,71 @@ export default function VocabularyStudio({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setFlipped((v) => !v)}
-            className={`flash-card group relative w-full text-left [perspective:1200px] ${
-              flipped ? 'is-flipped' : ''
+          <div
+            className={`flash-deck ${
+              deckMotion !== 'idle' ? `flash-deck-${deckMotion}` : ''
             }`}
-            aria-pressed={flipped}
           >
-            <span className="flash-card-inner relative block min-h-[14rem] w-full sm:min-h-[16rem]">
-              <span className="flash-card-face flash-card-front absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-white/70 bg-white/60 px-6 py-10 text-center shadow-card backdrop-blur-md">
-                <span className="text-[10px] tracking-[0.28em] text-ink-muted">
-                  英文 · 点击翻转
-                </span>
-                <span className="mt-5 font-display text-xl leading-snug text-ink sm:text-2xl md:text-3xl">
-                  {current?.english || '—'}
-                </span>
-                {current?.source && (
-                  <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
-                    · {current.source} ·
-                  </span>
-                )}
-                <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
-                  {flashIndex + 1} / {sortedEntries.length}
-                </span>
-              </span>
-              <span className="flash-card-face flash-card-back absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-[#c9a84c]/35 bg-[#f7efe4]/90 px-6 py-10 text-center shadow-card backdrop-blur-md">
-                <span className="text-[10px] tracking-[0.28em] text-ink-muted">
-                  中文 · 再点翻回
-                </span>
-                <span className="mt-5 font-display text-2xl leading-snug text-ink sm:text-3xl">
-                  {current?.chinese || '（未填中文）'}
-                </span>
-                {current?.source && (
-                  <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
-                    · {current.source} ·
-                  </span>
-                )}
-                <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
-                  {flashIndex + 1} / {sortedEntries.length}
-                </span>
-              </span>
-            </span>
-          </button>
-
-          <div className="mt-5 flex items-center justify-center gap-3">
             <button
               type="button"
-              onClick={() => goFlash(-1)}
+              onClick={() => setFlipped((v) => !v)}
+              className={`flash-card group relative w-full text-left [perspective:1200px] ${
+                flipped ? 'is-flipped' : ''
+              }`}
+              aria-pressed={flipped}
+            >
+              <span className="flash-card-inner relative block min-h-[14rem] w-full sm:min-h-[16rem]">
+                <span className="flash-card-face flash-card-front absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-white/70 bg-white/60 px-6 py-10 text-center shadow-card backdrop-blur-md">
+                  <span className="text-[10px] tracking-[0.28em] text-ink-muted">
+                    英文 · 点击翻转
+                  </span>
+                  <span className="mt-5 font-display text-xl leading-snug text-ink sm:text-2xl md:text-3xl">
+                    {current?.english || '—'}
+                  </span>
+                  {current?.source && (
+                    <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
+                      · {current.source} ·
+                    </span>
+                  )}
+                  <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
+                    {flashIndex + 1} / {sortedEntries.length}
+                  </span>
+                </span>
+                <span className="flash-card-face flash-card-back absolute inset-0 flex flex-col items-center justify-center rounded-sm border border-[#c9a84c]/35 bg-[#f7efe4]/90 px-6 py-10 text-center shadow-card backdrop-blur-md">
+                  <span className="text-[10px] tracking-[0.28em] text-ink-muted">
+                    中文 · 再点翻回
+                  </span>
+                  <span className="mt-5 font-display text-2xl leading-snug text-ink sm:text-3xl">
+                    {current?.chinese || '（未填中文）'}
+                  </span>
+                  {current?.source && (
+                    <span className="mt-4 text-[10px] tracking-wider text-ink-muted">
+                      · {current.source} ·
+                    </span>
+                  )}
+                  <span className="mt-6 text-[10px] tracking-[0.2em] text-ink-muted/80">
+                    {flashIndex + 1} / {sortedEntries.length}
+                  </span>
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <p className="mt-3 text-center font-serif text-[9px] tracking-[0.16em] text-ink-muted/75">
+            ← → 换卡 · 空格翻转
+          </p>
+
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => void goFlash(-1)}
               className="interactive-btn border border-[#c9a84c]/50 bg-[#c9a84c]/08 px-5 py-2 text-xs tracking-[0.22em] text-ink hover:bg-[#c9a84c]/18"
             >
               ← 上一张
             </button>
             <button
               type="button"
-              onClick={() => goFlash(1)}
+              onClick={() => void goFlash(1)}
               className="interactive-btn border border-[#c9a84c]/50 bg-[#c9a84c]/08 px-5 py-2 text-xs tracking-[0.22em] text-ink hover:bg-[#c9a84c]/18"
             >
               下一张 →

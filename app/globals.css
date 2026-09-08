@@ -524,6 +524,109 @@
   border-color: rgba(201, 168, 76, 0.4);
 }
 
+.flash-deck {
+  will-change: transform, opacity;
+}
+
+.flash-deck-exit-left {
+  animation: flashExitLeft 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.flash-deck-exit-right {
+  animation: flashExitRight 0.28s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.flash-deck-enter-left {
+  animation: flashEnterLeft 0.42s cubic-bezier(0.33, 1, 0.32, 1) both;
+}
+
+.flash-deck-enter-right {
+  animation: flashEnterRight 0.42s cubic-bezier(0.33, 1, 0.32, 1) both;
+}
+
+@keyframes flashExitLeft {
+  to {
+    opacity: 0;
+    transform: translateX(-1.35rem) scale(0.985);
+  }
+}
+
+@keyframes flashExitRight {
+  to {
+    opacity: 0;
+    transform: translateX(1.35rem) scale(0.985);
+  }
+}
+
+@keyframes flashEnterLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-1.35rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes flashEnterRight {
+  from {
+    opacity: 0;
+    transform: translateX(1.35rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.vocab-view-pane {
+  animation: vocabViewIn 0.45s cubic-bezier(0.33, 1, 0.32, 1) both;
+}
+
+@keyframes vocabViewIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vocab-row {
+  transition: background-color 0.35s ease;
+}
+
+.vocab-row:hover {
+  background-color: rgba(201, 168, 76, 0.06);
+}
+
+/* 内页标题轻入场 */
+.interactive-title-page .interactive-title-char {
+  opacity: 0;
+  transform: translateY(0.18em);
+  animation: titleCharEnter 0.7s cubic-bezier(0.33, 1, 0.32, 1) forwards;
+  animation-delay: calc(0.08s + var(--i, 0) * 28ms);
+}
+
+.filigree-enter {
+  opacity: 0;
+  animation: filigreeEnter 1.1s cubic-bezier(0.33, 1, 0.32, 1) 0.25s both;
+}
+
+@keyframes filigreeEnter {
+  from {
+    opacity: 0;
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
 .lily-sway-top {
   transform-origin: 20% 85%;
 }
@@ -824,7 +927,13 @@ mark.reading-mark {
   .cover-card-lift,
   .highlight-card,
   .flash-card-inner,
-  .home-est {
+  .home-est,
+  .flash-deck-exit-left,
+  .flash-deck-exit-right,
+  .flash-deck-enter-left,
+  .flash-deck-enter-right,
+  .vocab-view-pane,
+  .filigree-enter {
     animation: none !important;
     transition: none !important;
     transform: none !important;

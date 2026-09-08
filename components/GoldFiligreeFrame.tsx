@@ -8,7 +8,7 @@ export default function GoldFiligreeFrame() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-0"
+      className="filigree-enter pointer-events-none absolute inset-0 z-0"
       aria-hidden="true"
     >
       {/* 双线外框 */}
